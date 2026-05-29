@@ -766,64 +766,28 @@ input:checked + .slider:before {
     cursor: pointer;
 }
 
-/* Collapsible Credentials panel */
-.credentials-accordion {
+/* Search filter select (Date posted), matching Midnight Glass inputs */
+.search-fields-grid select {
+    width: 100%;
+    height: 43px;
+    background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    background: rgba(0, 0, 0, 0.15);
-    overflow: hidden;
-    transition: var(--transition-smooth);
-}
-.accordion-header {
-    padding: 12px 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    padding: 0 14px;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 13.5px;
     cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
     transition: var(--transition-smooth);
 }
-.accordion-header:hover {
-    color: white;
-    background: rgba(255, 255, 255, 0.02);
+.search-fields-grid select:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px var(--border-glow);
 }
-.arrow-icon {
-    font-size: 11px;
-    transition: transform 0.3s ease;
-}
-.credentials-accordion.open .arrow-icon {
-    transform: rotate(180deg);
-}
-
-.accordion-content {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.4s cubic-bezier(0, 1, 0, 1); /* Quick close, smooth slide open */
-}
-.credentials-accordion.open .accordion-content {
-    max-height: 300px;
-    border-top: 1px solid var(--border-color);
-}
-.creds-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1.2fr;
-    gap: 15px;
-    padding: 16px;
-}
-@media (max-width: 768px) {
-    .creds-grid {
-        grid-template-columns: 1fr;
-    }
-}
-.creds-notice {
-    font-size: 11px;
-    color: var(--text-muted);
-    padding: 0 16px 16px 16px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+.search-fields-grid select option {
+    background: #0d1117;
+    color: var(--text-primary);
 }
 
 /* Search results grid and cards */
