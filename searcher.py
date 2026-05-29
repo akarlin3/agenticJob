@@ -26,6 +26,10 @@ There are no login/credential parameters. The old username/password/api_token
 fields did nothing functional and were a security liability.
 """
 
+# Keep PEP 604 union annotations (e.g. ``list[str] | None``) lazy so the module
+# imports cleanly on Python 3.9, which is part of the CI matrix.
+from __future__ import annotations
+
 import os
 import re
 import time

@@ -2,6 +2,10 @@ import os
 from dotenv import load_dotenv
 import anthropic
 
+# Synthetic demo persona — not a real individual. Mock outputs are built from the
+# single source of truth in sample_data.py.
+import sample_data
+
 # Load environment variables
 load_dotenv()
 
@@ -13,6 +17,7 @@ def tailor_application_materials(job_details_json: str, gap_analysis_json: str, 
     """
     if mock:
         print("[Mock Mode] Bypassing Claude Resume/Cover Letter Customization API...")
+        # Synthetic demo persona — not a real individual (see sample_data.py).
         latex_mock = r"""\documentclass{article}
 \usepackage{geometry}
 \usepackage{hyperref}
@@ -20,15 +25,15 @@ def tailor_application_materials(job_details_json: str, gap_analysis_json: str, 
 \begin{document}
 
 \begin{center}
-    {\Huge \textbf{Avery Karlin}} \\
+    {\Huge \textbf{""" + sample_data.PERSONA_NAME + r"""}} \\
     \vspace{2pt}
-    Principal AI Systems Engineer \& Full Stack Architect \\
+    """ + sample_data.PERSONA_TITLE + r""" \\
     \vspace{2pt}
-    New York, NY | akarlin3@example.com | (555) 019-2831
+    """ + sample_data.PERSONA_LOCATION + " | " + sample_data.PERSONA_EMAIL + " | " + sample_data.PERSONA_PHONE + r"""
 \end{center}
 
 \section*{Professional Summary}
-Distinguished Principal Engineer specializing in the design, development, and scaling of hybrid multi-agent orchestration systems and distributed backend architectures. Proven expert at combining Gemini and Claude workflows with high-throughput PostgreSQL/Django systems. Proactively scaling infrastructure using AWS, Docker, Kubernetes, and Terraform.
+Software engineer specializing in the design, development, and scaling of hybrid multi-agent orchestration systems and distributed backend architectures. Experienced at combining Gemini and Claude workflows with PostgreSQL/Django systems, and scaling infrastructure using AWS, Docker, Kubernetes, and Terraform.
 
 \section*{Core Skills}
 \begin{itemize}
@@ -39,37 +44,37 @@ Distinguished Principal Engineer specializing in the design, development, and sc
 
 \section*{Professional Experience}
 \textbf{Lead AI \& Backend Systems Engineer} \hfill 2023 -- Present \\
-\textit{Cognitive Orchestration Labs}
+\textit{""" + sample_data.COMPANY_CURRENT + r"""}
 \begin{itemize}
-    \item Engineered a hybrid multi-agent workspace routing pipeline utilizing Gemini and Claude models, successfully scaling to process 10k+ prompt workloads per minute.
-    \item Implemented structured data ingestion and semantic search pipelines, improving vector indexing (PostgreSQL pgvector) and prompt latency by 45\%.
-    \item Built and deployed infrastructure using AWS ECS, Kubernetes, and Docker, provisioning with Terraform for 99.99\% reliability.
+    \item Engineered a hybrid multi-agent workspace routing pipeline utilizing Gemini and Claude models, handling """ + sample_data.THROUGHPUT_PROMPTS + r""" in load tests.
+    \item Implemented structured data ingestion and semantic search pipelines, improving vector indexing (PostgreSQL pgvector) and prompt latency.
+    \item Built and deployed infrastructure using AWS ECS, Kubernetes, and Docker, provisioning with Terraform.
 \end{itemize}
 
 \textbf{Senior Full Stack Developer} \hfill 2020 -- 2023 \\
-\textit{FinTech Core Solutions}
+\textit{""" + sample_data.COMPANY_PREVIOUS + r"""}
 \begin{itemize}
-    \item Developed payment APIs in Django and PostgreSQL processing over \$10M daily with deep query tuning and connection pooling.
-    \item Led migration of legacy user interfaces to a modern React + Next.js platform, improving Core Web Vitals (LCP) by 1.2s.
+    \item Developed payment APIs in Django and PostgreSQL processing """ + sample_data.PAYMENT_VOLUME + r""" in a sandbox environment, with query tuning and connection pooling.
+    \item Led migration of legacy user interfaces to a modern React + Next.js platform, improving Core Web Vitals.
 \end{itemize}
 
 \end{document}"""
-        
-        cover_letter_mock = """# Cover Letter - Avery Karlin
+
+        cover_letter_mock = "# Cover Letter - " + sample_data.PERSONA_NAME + """
 
 Dear Hiring Manager,
 
-I am writing to express my enthusiastic interest in the Senior Full Stack AI Orchestration Engineer role. Having spent years designing and developing hybrid multi-agent pipelines and high-throughput financial backends, I was thrilled to read your requirements for an engineer skilled in LLM orchestration, FastAPI, and PostgreSQL performance tuning.
+I am writing to express my enthusiastic interest in the Senior Full Stack AI Orchestration Engineer role. Having designed and developed hybrid multi-agent pipelines and high-throughput backends, I was glad to read your requirements for an engineer skilled in LLM orchestration, FastAPI, and PostgreSQL performance tuning.
 
-At Cognitive Orchestration Labs, I designed a multi-agent workspace routing engine that coordinates both Google's Gemini models and Anthropic's Claude APIs, handling high-volume workloads with stateful tracking and validation via Pydantic. Furthermore, at FinTech Core Solutions, I optimized transactional APIs in Django and PostgreSQL that processed over $10M in volume daily. This deep experience in database query optimization, connection pooling, and asynchronous task management maps directly to your need for defending backend performance metrics.
+At """ + sample_data.COMPANY_CURRENT + """, I designed a multi-agent workspace routing engine that coordinates both Google's Gemini models and Anthropic's Claude APIs, handling high-volume workloads with stateful tracking and validation via Pydantic. Furthermore, at """ + sample_data.COMPANY_PREVIOUS + """, I optimized transactional APIs in Django and PostgreSQL in a sandbox environment. This experience in database query optimization, connection pooling, and asynchronous task management maps directly to your need for defending backend performance metrics.
 
-I notice you have listed experience with GCP/GKE and PyTorch as preferred. While my primary production deployments have been centered on AWS, Kubernetes, and Terraform, I have extensive experience setting up localized container environments, and I am eager to transition my container orchestration expertise to GKE. Additionally, my strong foundations in Python and modern agentic engineering make me extremely well-suited to rapidly apply PyTorch-based sequence classifiers to your risk assessment hot-paths.
+I notice you have listed experience with GCP/GKE and PyTorch as preferred. While my primary deployments have centered on AWS, Kubernetes, and Terraform, I have experience setting up containerized environments and am eager to transition my container orchestration expertise to GKE. Additionally, my foundations in Python and agentic engineering make me well-suited to rapidly apply PyTorch-based sequence classifiers to your risk assessment hot-paths.
 
-I look forward to discussing how my experience with state-of-the-art AI systems and robust backend development can contribute to the success of your platform.
+I look forward to discussing how my experience with AI systems and backend development can contribute to the success of your platform.
 
-Sincerely,  
-Avery Karlin"""
-        
+Sincerely,
+""" + sample_data.PERSONA_NAME
+
         return latex_mock, cover_letter_mock
 
     api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -107,7 +112,7 @@ Avery Karlin"""
     ]
     
     system_prompt = """
-    You are an elite executive resume writer and career coach. Your task is to customize the candidate's resume and write a matching cover letter.
+    You are an elite executive resume writer and career coach. Your task is to customize the candidate's resume and write a matching cover letter based strictly on the supplied portfolio.
     
     Follow these instructions carefully:
     1. Tailor the LaTeX resume using standard, professional LaTeX (like article class, simple packages like geometry, hyperref, and modern CV patterns). Avoid highly customized template libraries that require local compilation dependencies (e.g. fontawesome5, unless standard) to ensure it compiles flawlessly out-of-the-box on standard LaTeX engines (e.g., pdfLaTeX).
@@ -119,8 +124,8 @@ Avery Karlin"""
     
     prompt = f"""
     CANDIDATE PORTFOLIO / BIO INFO:
-    Avery Karlin is a Principal AI Systems Engineer and Full Stack Architect with expertise in Python, Django, FastAPI, React, Next.js, PostgreSQL, Docker, AWS, Kubernetes, Terraform, and multi-agent orchestration.
-    
+    {sample_data.PERSONA_BIO}
+
     JOB DETAILS:
     {job_details_json}
     

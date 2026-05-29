@@ -11,16 +11,27 @@ The pipeline combines the strengths of **Google GenAI** (Gemini 2.5) and **Anthr
 
 ## Web Application Interface (Midnight Glass Theme)
 
-This system comes with an interactive, gorgeous, and fully functional **Single Page Web Application** featuring:
+This system comes with an interactive, fully functional **Single Page Web Application** featuring:
 - **Responsive Layout**: Designed using a curated modern glassmorphism aesthetic with custom HSL styling and glow orbs.
 - **Drag-and-Drop PDF Upload**: Interactively upload your latest `master_portfolio.pdf` directly from the browser.
-- **Real-Time Log Monitor**: Watch as the orchestrator spins up each agent sequentially with glowing hacker terminal logs.
+- **Real-Time Log Monitor**: Watch as the orchestrator spins up each agent sequentially with terminal-style logs.
 - **Dynamic Dashboard**: Includes an animated matching gauge, fit scores, and critical gap breakdowns.
 - **Side-by-Side Previews**: View the customized LaTeX resume source, full cover letter markdown, and coach strategy cards side-by-side with instant clipboard copies and file download links.
 
-### **The Web App is Currently Running Live!**
-The server is currently running in your background. You can open it in your browser immediately:
-👉 **[http://localhost:8000](http://localhost:8000)**
+![Mock-mode dashboard: match-fit gauge, agent visualizer, and gap analysis](docs/media/dashboard-mock.png)
+
+> _Screenshot captured running the pipeline in `--mock` mode (no API keys), using the
+> bundled synthetic sample portfolio._
+
+### Running the demo locally
+There is no hosted demo — the live pipeline makes billable Gemini + Anthropic API
+calls. To try the web UI yourself, run it locally (it boots in mock mode with no
+keys required):
+```bash
+python3 -m uvicorn app:app --port 8000 --reload
+```
+Then open **http://localhost:8000** in your browser. Leave the **Validation Dry-Run**
+toggle on to run fully offline with the synthetic sample data.
 
 ---
 
@@ -59,7 +70,9 @@ graph TD
 ```
 ├── .env                     # API Credentials (ignored by git)
 ├── requirements.txt         # Project dependencies
-├── create_portfolio.py      # Generates a premium master_portfolio.pdf with ReportLab
+├── requirements-dev.txt     # Dev/test dependencies (pytest, httpx)
+├── sample_data.py           # Synthetic demo persona (single source of truth)
+├── create_portfolio.py      # Generates master_portfolio.pdf with ReportLab
 ├── master_portfolio.pdf     # The master resume/portfolio compiled dynamically
 ├── sample_job.txt           # Sample target job description
 ├── ingestion.py             # Agent 1 (Gemini 2.5 Flash Ingestion)
@@ -72,6 +85,8 @@ graph TD
 │   ├── index.html           # Web UI layout
 │   ├── style.css            # Midnight Glass design stylesheet
 │   └── app.js               # Reactive frontend logic, animations, and API calls
+├── tests/                   # Offline unit tests (pytest, mock mode)
+├── docs/media/              # README screenshots
 ├── output/                  # Generated tailored artifacts
 │   ├── job_analysis.json    # Ingested job specifications
 │   ├── fit_evaluation.json  # Go/no-go fit score and gap analysis
@@ -99,11 +114,17 @@ python3 -m pip install -r requirements.txt
 ```
 
 ### 3. Generate Master Portfolio PDF
-Compile a professional, beautiful master resume portfolio for candidate Avery Karlin:
+Compile the bundled sample master résumé portfolio:
 ```bash
 python3 create_portfolio.py
 ```
 This generates `master_portfolio.pdf` in the workspace root.
+
+> **Note:** The bundled portfolio is **synthetic sample data** for a fictional demo
+> persona ("Jordan Sample," defined in [`sample_data.py`](sample_data.py)) — it is
+> not a real person's credentials. Supply your own résumé by uploading a PDF in the
+> web UI, or by replacing `master_portfolio.pdf` and configuring your `.env`
+> (which is git-ignored).
 
 ### 4. Configure API Keys
 Edit the `.env` file in the project root:
@@ -172,13 +193,20 @@ This ensures Claude returns only the exact fields `latex_resume` and `markdown_c
 
 Every push and pull request is validated by GitHub Actions (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)). The CI pipeline runs across Python 3.9–3.12 and:
 
-1. Installs all dependencies from `requirements.txt`.
+1. Installs all dependencies from `requirements-dev.txt`.
 2. Byte-compiles every source file to catch syntax errors.
-3. Generates the `master_portfolio.pdf` via `create_portfolio.py`.
-4. Runs the full orchestration pipeline in `--mock` mode as an end-to-end smoke test.
-5. Verifies that all expected output artifacts (`job_analysis.json`, `fit_evaluation.json`, `tailored_resume.tex`, `cover_letter.md`, `interview_prep.md`) are produced and non-empty.
+3. Runs the offline unit test suite with `pytest` (helpers, mock agent branches, schema validation, and the Go/No-Go pipeline branch).
+4. Generates the `master_portfolio.pdf` via `create_portfolio.py`.
+5. Runs the full orchestration pipeline in `--mock` mode as an end-to-end smoke test.
+6. Verifies that all expected output artifacts (`job_analysis.json`, `fit_evaluation.json`, `tailored_resume.tex`, `cover_letter.md`, `interview_prep.md`) are produced and non-empty.
 
-Because the smoke test runs in mock mode, **no API keys or billing are required** for CI to pass.
+Because the tests and smoke test run in mock mode, **no API keys or billing are required** for CI to pass.
+
+### Running the tests locally
+```bash
+python3 -m pip install -r requirements-dev.txt
+python3 -m pytest -q
+```
 
 ---
 

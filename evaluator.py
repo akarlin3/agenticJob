@@ -5,6 +5,9 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
+# Synthetic demo persona — not a real individual (see sample_data.py).
+import sample_data
+
 # Load environment variables
 load_dotenv()
 
@@ -59,7 +62,7 @@ def get_or_create_portfolio_cache(client: genai.Client, portfolio_path: str) -> 
         model=model_name,
         config=types.CreateCachedContentConfig(
             display_name=cache_display_name,
-            system_instruction="You are an expert career strategist and recruiter. You have access to Avery Karlin's master portfolio. Use it to compare with incoming job specifications.",
+            system_instruction=f"You are an expert career strategist and recruiter. You have access to {sample_data.PERSONA_NAME}'s master portfolio. Use it to compare with incoming job specifications.",
             contents=[uploaded_file],
             ttl="3600s"
         ),
