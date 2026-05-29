@@ -29,10 +29,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       - name: Syntax check (byte-compile all sources)
         run: python -m compileall -q .
+
+      - name: Run unit tests (pytest, offline / mock mode)
+        run: python -m pytest -q
 
       - name: Generate master portfolio PDF
         run: python create_portfolio.py

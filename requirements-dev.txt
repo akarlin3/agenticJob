@@ -1,0 +1,5 @@
+# Development / test dependencies (not needed at runtime).
+# Install with: python3 -m pip install -r requirements-dev.txt
+-r requirements.txt
+pytest>=7.0.0
+httpx>=0.24.0   # required by fastapi.testclient.TestClient
