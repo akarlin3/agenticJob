@@ -1,0 +1,24 @@
+Role: Senior Full Stack AI Orchestration Engineer (FinTech / SaaS)
+Location: New York, NY (Hybrid)
+
+About the Role:
+We are building a next-generation AI-driven autonomous financial orchestration platform that simplifies complex payment reconciliation and predictive accounting for global enterprise SaaS customers. As a Senior AI Orchestration Engineer, you will own the end-to-end architecture of our multi-agent decision routing system and scale the underlying real-time payment ingestion APIs.
+
+Required Technical Stack:
+- 5+ years of experience with Python, FastAPI, and React.
+- Solid production expertise in designing databases with PostgreSQL (including performance tuning, connection pooling, and complex queries).
+- Professional experience orchestrating multiple LLM providers (e.g. Gemini, Claude, OpenAI) in production agent workflows.
+- Strong containerization experience using Docker and deploying to AWS ECS or Kubernetes.
+- Experience with infrastructure-as-code using Terraform.
+- Familiarity with Rust or C++ for hot-path optimization is a strong plus.
+- Hands-on experience with GCP (Google Cloud Platform) and Google Kubernetes Engine (GKE) is preferred.
+- Experience using PyTorch or TensorFlow for training/fine-tuning small custom sequence classifiers is highly valued.
+
+Key Responsibilities:
+- Design, scale, and optimize high-throughput REST APIs using Python (FastAPI/Django) and PostgreSQL.
+- Build reliable, stateful multi-agent frameworks using prompt routing, structured JSON validation (Pydantic), and semantic search indexing.
+- Lead the migration of core accounting interfaces from legacy components to a modern, highly responsive React-based SPA.
+- Manage container deployments, CI/CD integrations via GitHub Actions, and environment provisioning via Terraform.
+- Defend backend performance metrics: ensure database connection pooling, low query latency, and reliable API runtimes.
+- Collaborate with the Risk & Security team to enforce rigorous payment security protocols.
+- Mentor junior engineers and champion clean code standards through peer reviews and design sessions.

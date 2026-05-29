@@ -1,0 +1,13 @@
+# Local Credentials
+.env
+.credentials.json
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Dynamically generated assets & outputs
+master_portfolio.pdf
+output/
