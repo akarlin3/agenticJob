@@ -4,6 +4,12 @@ import json
 import argparse
 from dotenv import load_dotenv
 
+# Fallback to handle uvicorn loading main:app instead of app:app
+try:
+    from app import app
+except ImportError:
+    pass
+
 # Load env variables
 load_dotenv()
 
