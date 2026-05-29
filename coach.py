@@ -2,6 +2,9 @@ import os
 from dotenv import load_dotenv
 import anthropic
 
+# Synthetic demo persona — not a real individual (see sample_data.py).
+import sample_data
+
 # Load environment variables
 load_dotenv()
 
@@ -16,7 +19,7 @@ def generate_interview_prep(job_details_json: str, gap_analysis_json: str, mock:
         print("[Mock Mode] Bypassing Claude Interview Coaching API...")
         return [
             {
-                "question": "Can you walk us through the architectural design of the hybrid multi-agent routing system you built at Cognitive Orchestration Labs? How did you delegate tasks between Gemini and Claude?",
+                "question": f"Can you walk us through the architectural design of the hybrid multi-agent routing system you built at {sample_data.COMPANY_CURRENT}? How did you delegate tasks between Gemini and Claude?",
                 "type": "Technical",
                 "rationale": "Directly tests the candidate's core domain expertise in AI systems engineering, agent design patterns, and handling high-volume workloads.",
                 "suggested_strategy": "Explain the orchestrator and router patterns. Highlight how Gemini was used for high-speed, cost-effective structured ingestion (flash), while Claude was leveraged for deep reasoning (sonnet) or tailored coding. Mention managing latency, prompt routing, and parsing validation with Pydantic."
@@ -43,7 +46,7 @@ def generate_interview_prep(job_details_json: str, gap_analysis_json: str, mock:
                 "question": "Tell us about a time you had to defend backend performance metrics under high-throughput conditions. What database and API strategies did you use?",
                 "type": "Behavioral",
                 "rationale": "Evaluates the candidate's core backend performance defending responsibilities.",
-                "suggested_strategy": "Use the STAR method to describe a scenario at FinTech Core Solutions processing $10M+ daily. Detail the database optimizations: implementing connection pooling (e.g. pgBouncer), writing index queries, query profiling with EXPLAIN ANALYZE, and caching static lookups with Redis. Quantify the results (e.g., reduced API latency by 45%)."
+                "suggested_strategy": f"Use the STAR method to describe a scenario at {sample_data.COMPANY_PREVIOUS} optimizing payment APIs. Detail the database optimizations: implementing connection pooling (e.g. pgBouncer), writing index queries, query profiling with EXPLAIN ANALYZE, and caching static lookups with Redis. Quantify the results (e.g., reduced API latency)."
             }
         ]
 
@@ -80,8 +83,8 @@ def generate_interview_prep(job_details_json: str, gap_analysis_json: str, mock:
         }
     ]
     
-    system_prompt = """
-    You are an elite technology interview coach. Your task is to prepare a candidate (Avery Karlin) for an interview by generating highly targeted technical and behavioral questions.
+    system_prompt = f"""
+    You are an elite technology interview coach. Your task is to prepare a candidate ({sample_data.PERSONA_NAME}) for an interview by generating highly targeted technical and behavioral questions.
     Focus heavily on:
     1. The core responsibilities and technical stack required by the job description.
     2. The technical gaps identified in the evaluation phase, to help the candidate prepare to address these weaknesses proactively.
@@ -96,7 +99,7 @@ def generate_interview_prep(job_details_json: str, gap_analysis_json: str, mock:
     GAP ANALYSIS / EVALUATION:
     {gap_analysis_json}
     
-    Please generate 5-6 extremely relevant interview questions (mix of technical and behavioral) that Avery should prepare for, especially focusing on how to defend their technical gaps.
+    Please generate 5-6 extremely relevant interview questions (mix of technical and behavioral) that the candidate should prepare for, especially focusing on how to defend their technical gaps.
     """
     
     print("Calling Claude 3.5 Sonnet to generate interview coach preparation guide...")
