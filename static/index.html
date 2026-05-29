@@ -142,7 +142,7 @@
                         <div class="tab-content active" id="tab-discovery">
                             <div class="discovery-header">
                                 <h3><i class="fa-solid fa-magnifying-glass-location"></i> Job Board Search Grounding</h3>
-                                <p>Authenticate secure credentials and query active postings on LinkedIn, Indeed, ZipRecruiter, and more using Agent 0.</p>
+                                <p>Query active postings aggregated from LinkedIn, Indeed, ZipRecruiter, and more using Agent 0.</p>
                             </div>
 
                             <form id="job-search-form" class="job-search-form">
@@ -163,29 +163,21 @@
                                             <label><input type="checkbox" name="search_platform" value="ZipRecruiter" checked> ZipRecruiter</label>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div class="credentials-accordion">
-                                    <div class="accordion-header" id="toggle-creds-btn">
-                                        <span><i class="fa-solid fa-key"></i> Job Board Secure Login Credentials (Optional)</span>
-                                        <i class="fa-solid fa-chevron-down arrow-icon"></i>
+                                    <div class="form-group">
+                                        <label for="search_date_posted">Date Posted</label>
+                                        <select id="search_date_posted">
+                                            <option value="all">Any time</option>
+                                            <option value="today">Past 24 hours</option>
+                                            <option value="3days">Past 3 days</option>
+                                            <option value="week">Past week</option>
+                                            <option value="month" selected>Past month</option>
+                                        </select>
                                     </div>
-                                    <div class="accordion-content" id="creds-content-panel">
-                                        <div class="creds-grid">
-                                            <div class="form-group">
-                                                <label for="auth_user">Username / Email</label>
-                                                <input type="text" id="auth_user" placeholder="e.g. email@example.com">
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="auth_pass">Password</label>
-                                                <input type="password" id="auth_pass" placeholder="••••••••">
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="auth_token">Developer API Bearer Token</label>
-                                                <input type="text" id="auth_token" placeholder="Bearer sk-linkedin-...">
-                                            </div>
+                                    <div class="form-group">
+                                        <label for="search_remote">Remote</label>
+                                        <div class="custom-multiselect">
+                                            <label><input type="checkbox" id="search_remote"> Remote only</label>
                                         </div>
-                                        <p class="creds-notice"><i class="fa-solid fa-info-circle"></i> Logins are processed locally over secure session headers to scrape restricted member feeds. Leaving credentials empty executes a high-fidelity public search.</p>
                                     </div>
                                 </div>
 

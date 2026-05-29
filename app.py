@@ -30,32 +30,33 @@ async def run_search(
     query: str = Form(...),
     location: str = Form(...),
     platforms: str = Form(...), # Comma separated list of boards
-    username: str = Form(None),
-    password: str = Form(None),
-    api_token: str = Form(None),
+    date_posted: str = Form("month"), # all | today | 3days | week | month
+    remote: bool = Form(False),
     mock: bool = Form(True)
 ):
     """
-    POST route to search various job boards using Agent 0.
+    POST route to search real job boards using Agent 0 (JSearch primary,
+    Adzuna fallback). No login/credential flow.
     """
     try:
         platform_list = [p.strip() for p in platforms.split(",") if p.strip()]
         if not platform_list:
             platform_list = ["LinkedIn", "Indeed"]
-            
+
         jobs = search_jobs(
             query=query,
             location=location,
             platforms=platform_list,
-            username=username,
-            password=password,
-            api_token=api_token,
+            date_posted=date_posted,
+            remote=remote,
             mock=mock
         )
         return {"status": "success", "jobs": jobs}
     except Exception as e:
+        # Surface the actionable error from search_jobs (e.g. the
+        # "no provider configured" RuntimeError) as the detail.
         print(f"Error in search API: {e}")
-        raise HTTPException(status_code=500, detail=f"Job search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/run")
 async def run_pipeline(

@@ -248,14 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
         nextLog();
     }
 
-    // 5. Job Discovery search event handlers & accordion
-    const toggleCredsBtn = document.getElementById("toggle-creds-btn");
-    const credsAccordion = toggleCredsBtn.closest(".credentials-accordion");
-
-    toggleCredsBtn.addEventListener("click", () => {
-        credsAccordion.classList.toggle("open");
-    });
-
+    // 5. Job Discovery search event handlers
     const jobSearchForm = document.getElementById("job-search-form");
     const btnSearch = document.getElementById("btn-search");
     const searchResultsSection = document.getElementById("search-results-section");
@@ -280,18 +273,16 @@ document.addEventListener("DOMContentLoaded", () => {
             checkedPlatforms.push(cb.value);
         });
         
-        const username = document.getElementById("auth_user").value;
-        const password = document.getElementById("auth_pass").value;
-        const apiToken = document.getElementById("auth_token").value;
+        const datePosted = document.getElementById("search_date_posted").value;
+        const remoteOnly = document.getElementById("search_remote").checked;
         const isMock = document.getElementById("mock").checked;
 
         const formData = new FormData();
         formData.append("query", query);
         formData.append("location", location);
         formData.append("platforms", checkedPlatforms.join(","));
-        if (username) formData.append("username", username);
-        if (password) formData.append("password", password);
-        if (apiToken) formData.append("api_token", apiToken);
+        formData.append("date_posted", datePosted);
+        formData.append("remote", remoteOnly);
         formData.append("mock", isMock);
 
         try {
@@ -343,6 +334,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="jc-meta">
                     <span><strong>Company:</strong> ${job.company}</span>
                     <span><strong>Location:</strong> ${job.location}</span>
+                    ${job.posted ? `<span><strong>Posted:</strong> ${job.posted}</span>` : ""}
                 </div>
                 <div class="jc-snippet">${job.snippet}</div>
                 <div class="jc-actions">
@@ -354,12 +346,16 @@ document.addEventListener("DOMContentLoaded", () => {
             // Wire up the Customization trigger button
             const analyzeBtn = card.querySelector(".btn-analyze-job");
             analyzeBtn.addEventListener("click", () => {
-                // Formulate simulated job specs based on sourced post details
+                // Feed the FULL job description into the pipeline when available,
+                // falling back to the short card snippet only if it's empty.
+                const jobBody = (job.description && job.description.trim())
+                    ? job.description
+                    : job.snippet;
                 const simulatedJobSpec = `Role: ${job.title} at ${job.company}
 Location: ${job.location}
 
 Summary & Requirements:
-${job.snippet}
+${jobBody}
 
 Source Job Link:
 ${job.url}
