@@ -1,5 +1,8 @@
 # Hybrid Multi-Agent Job Search Pipeline
 
+[![CI](https://github.com/akarlin3/agenticjob/actions/workflows/ci.yml/badge.svg)](https://github.com/akarlin3/agenticjob/actions/workflows/ci.yml)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
+
 A production-ready, highly modular orchestration pipeline in Python that evaluates job descriptions against a master portfolio PDF and generates tailored job application materials.
 
 The pipeline combines the strengths of **Google GenAI** (Gemini 2.5) and **Anthropic** (Claude 3.5 Sonnet) models, implementing advanced patterns like **Structured JSON Outputs**, **Forced Tool Use**, and **Stateful Context Caching** to ensure a reliable and highly tailored application package.
@@ -162,3 +165,25 @@ response = client.messages.create(
 )
 ```
 This ensures Claude returns only the exact fields `latex_resume` and `markdown_cover_letter`, avoiding regex parsing errors.
+
+---
+
+## Continuous Integration
+
+Every push and pull request is validated by GitHub Actions (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)). The CI pipeline runs across Python 3.9–3.12 and:
+
+1. Installs all dependencies from `requirements.txt`.
+2. Byte-compiles every source file to catch syntax errors.
+3. Generates the `master_portfolio.pdf` via `create_portfolio.py`.
+4. Runs the full orchestration pipeline in `--mock` mode as an end-to-end smoke test.
+5. Verifies that all expected output artifacts (`job_analysis.json`, `fit_evaluation.json`, `tailored_resume.tex`, `cover_letter.md`, `interview_prep.md`) are produced and non-empty.
+
+Because the smoke test runs in mock mode, **no API keys or billing are required** for CI to pass.
+
+---
+
+## License
+
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See the [`LICENSE`](LICENSE) file for the full text.
+
+The AGPL additionally requires that if you run a modified version of this software to provide a service over a network (for example, the bundled FastAPI web application), you must make the corresponding source code of your modified version available to the users of that service.
