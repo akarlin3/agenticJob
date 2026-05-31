@@ -1,7 +1,6 @@
 import logging
 import os
 import time
-from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
@@ -11,6 +10,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +27,11 @@ _gemini_retry = retry(
 # Synthetic demo persona — not a real individual (see sample_data.py).
 import sample_data
 
-# Load environment variables
-load_dotenv()
 
 class EvaluationResult(BaseModel):
     fit_score_out_of_100: int = Field(description="Calculated fit score from 0 to 100 based on matching credentials.")
     technical_gaps: list[str] = Field(description="Technologies, tools, or concepts mentioned in the job description that are missing or weak in the portfolio.")
-    go_no_go: bool = Field(description="True if fit_score_out_of_100 >= 70, otherwise False.")
+    go_no_go: bool = Field(description=f"True if fit_score_out_of_100 >= {settings.fit_threshold}, otherwise False.")
 
 def get_or_create_portfolio_cache(client: genai.Client, portfolio_path: str) -> str:
     """
@@ -41,7 +40,7 @@ def get_or_create_portfolio_cache(client: genai.Client, portfolio_path: str) -> 
     Returns the cache name.
     """
     cache_display_name = "master_portfolio_cache"
-    model_name = "gemini-2.5-pro"
+    model_name = settings.gemini_pro_model
     
     try:
         caches = client.caches.list()
@@ -85,7 +84,7 @@ def get_or_create_portfolio_cache(client: genai.Client, portfolio_path: str) -> 
                 display_name=cache_display_name,
                 system_instruction=f"You are an expert career strategist and recruiter. You have access to {sample_data.PERSONA_NAME}'s master portfolio. Use it to compare with incoming job specifications.",
                 contents=[uploaded_file],
-                ttl="3600s",
+                ttl=f"{settings.portfolio_cache_ttl_seconds}s",
             ),
         )
 
@@ -95,8 +94,8 @@ def get_or_create_portfolio_cache(client: genai.Client, portfolio_path: str) -> 
 
 def evaluate_job_fit(job_json_str: str, portfolio_path: str = "master_portfolio.pdf", mock: bool = False) -> EvaluationResult:
     """
-    Compares the job JSON against the cached portfolio PDF using gemini-2.5-pro,
-    and returns a structured EvaluationResult.
+    Compares the job JSON against the cached portfolio PDF using the configured
+    Gemini Pro model, and returns a structured EvaluationResult.
     """
     if mock:
         logger.info("[Mock Mode] Bypassing Gemini Caching & Evaluation API...")
@@ -110,30 +109,30 @@ def evaluate_job_fit(job_json_str: str, portfolio_path: str = "master_portfolio.
             go_no_go=True
         )
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = settings.gemini_api_key
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable is not set. Please set it in your .env file.")
-        
+
     client = genai.Client(api_key=api_key)
     cache_name = get_or_create_portfolio_cache(client, portfolio_path)
-    
+
     prompt = f"""
     Compare the candidate's master portfolio with the following ingested job specifications:
-    
+
     JOB ANALYSIS:
     {job_json_str}
-    
+
     Calculate a fit score out of 100.
     Perform a gap analysis of missing or weak technical skills or experiences.
-    Set go_no_go to True if fit_score_out_of_100 >= 70, otherwise set it to False.
+    Set go_no_go to True if fit_score_out_of_100 >= {settings.fit_threshold}, otherwise set it to False.
     """
-    
-    logger.info("Running evaluation against cached portfolio using gemini-2.5-pro...")
+
+    logger.info("Running evaluation against cached portfolio using %s...", settings.gemini_pro_model)
 
     @_gemini_retry
     def _call():
         return client.models.generate_content(
-            model="gemini-2.5-pro",
+            model=settings.gemini_pro_model,
             contents=prompt,
             config=types.GenerateContentConfig(
                 cached_content=cache_name,

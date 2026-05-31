@@ -1,19 +1,22 @@
 import logging
 import os
-import shutil
 import json
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 # Import agent pipeline modules
+from config import settings
 from ingestion import ingest_job_description
 from evaluator import evaluate_job_fit
 from tailor import tailor_application_materials
 from coach import generate_interview_prep
 from create_portfolio import generate_portfolio
 from searcher import search_jobs
+
+PDF_MAGIC = b"%PDF-"
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -50,13 +53,14 @@ async def run_search(
         if not platform_list:
             platform_list = ["LinkedIn", "Indeed"]
 
-        jobs = search_jobs(
+        jobs = await run_in_threadpool(
+            search_jobs,
             query=query,
             location=location,
             platforms=platform_list,
             date_posted=date_posted,
             remote=remote,
-            mock=mock
+            mock=mock,
         )
         return {"status": "success", "jobs": jobs}
     except Exception as e:
@@ -84,9 +88,25 @@ async def run_pipeline(
     portfolio_path = "master_portfolio.pdf"
     if portfolio:
         log(f"Received portfolio upload: '{portfolio.filename}'")
+        # Read the upload, enforcing the configured size cap and validating that
+        # the bytes really are a PDF (magic-byte check, not just the extension).
+        contents = await portfolio.read(settings.max_upload_bytes + 1)
+        if len(contents) > settings.max_upload_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"Uploaded portfolio exceeds maximum size of "
+                    f"{settings.max_upload_bytes} bytes."
+                ),
+            )
+        if not contents.startswith(PDF_MAGIC):
+            raise HTTPException(
+                status_code=400,
+                detail="Uploaded portfolio is not a valid PDF file.",
+            )
         try:
             with open(portfolio_path, "wb") as buffer:
-                shutil.copyfileobj(portfolio.file, buffer)
+                buffer.write(contents)
             log("Portfolio saved successfully.")
         except Exception as e:
             log(f"Error saving uploaded portfolio: {e}")
@@ -95,7 +115,7 @@ async def run_pipeline(
         if not os.path.exists(portfolio_path):
             log("No master portfolio uploaded or found. Generating a modern sample portfolio using create_portfolio.py...")
             try:
-                generate_portfolio(portfolio_path)
+                await run_in_threadpool(generate_portfolio, portfolio_path)
                 log("Modern portfolio PDF generated successfully.")
             except Exception as e:
                 log(f"Error compiling portfolio PDF: {e}")
@@ -106,7 +126,7 @@ async def run_pipeline(
     # 2. Agent 1 - Ingestion (Gemini 2.5 Flash)
     log("Agent 1 (Ingestion): Analyzing job description and extracting structured metadata...")
     try:
-        job_analysis = ingest_job_description(job_description, mock=mock)
+        job_analysis = await run_in_threadpool(ingest_job_description, job_description, mock=mock)
         job_analysis_dict = job_analysis.model_dump()
         job_analysis_json = job_analysis.model_dump_json(indent=2)
         
@@ -125,7 +145,7 @@ async def run_pipeline(
     # 3. Agent 2 - Evaluator (Gemini 2.5 Pro + Context Caching)
     log("Agent 2 (Evaluator): Evaluating candidate credentials against job requirements with Context Caching...")
     try:
-        eval_result = evaluate_job_fit(job_analysis_json, portfolio_path, mock=mock)
+        eval_result = await run_in_threadpool(evaluate_job_fit, job_analysis_json, portfolio_path, mock=mock)
         eval_result_dict = eval_result.model_dump()
         eval_result_json = eval_result.model_dump_json(indent=2)
         
@@ -159,10 +179,11 @@ async def run_pipeline(
     tailored_resume = ""
     cover_letter = ""
     try:
-        tailored_resume, cover_letter = tailor_application_materials(
+        tailored_resume, cover_letter = await run_in_threadpool(
+            tailor_application_materials,
             job_details_json=job_analysis_json,
             gap_analysis_json=eval_result_json,
-            mock=mock
+            mock=mock,
         )
         
         # Save output files
@@ -183,10 +204,11 @@ async def run_pipeline(
     log("Agent 4 (Interview Coach): Generating targeted preparation guide to defend technical gaps...")
     questions = []
     try:
-        questions = generate_interview_prep(
+        questions = await run_in_threadpool(
+            generate_interview_prep,
             job_details_json=job_analysis_json,
             gap_analysis_json=eval_result_json,
-            mock=mock
+            mock=mock,
         )
         
         # Save Markdown Guide
