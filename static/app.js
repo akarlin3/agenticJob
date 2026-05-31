@@ -124,53 +124,180 @@ document.addEventListener("DOMContentLoaded", () => {
         triggerPipeline();
     });
 
+    const STAGE_NODES = {
+        ingestion: nodeIngestion,
+        evaluator: nodeEvaluator,
+        tailor: nodeTailor,
+        coach: nodeCoach,
+    };
+    const STAGE_CONNECTOR_AFTER = {
+        ingestion: conn1,
+        evaluator: conn2,
+        tailor: conn3,
+    };
+
+    function finishRun() {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = `<i class="fa-solid fa-play"></i> Run Orchestration Pipeline`;
+    }
+
     async function triggerPipeline() {
-        // Reset states
         agentVisualizer.style.display = "flex";
         resetVisualizer();
-        
+
         btnSubmit.disabled = true;
         btnSubmit.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing pipeline...`;
-        
+
         setStatus("running", "Running");
         consoleLogs.innerHTML = "";
         addLogLine("system", "[Orchestrator] Starting end-to-end multi-agent orchestration...");
 
-        // Start step animation pipeline
-        setNodeActive(nodeIngestion);
-        addLogLine("agent", "[Agent Ingestion] Activating Ingestion Agent (Gemini 2.5 Flash)...");
-
-        // Construct Form Data
         const formData = new FormData();
         formData.append("job_description", document.getElementById("job_description").value);
         formData.append("mock", document.getElementById("mock").checked);
-        
         if (portfolioInput.files.length > 0) {
             formData.append("portfolio", portfolioInput.files[0]);
         }
 
+        // Accumulator that mirrors the legacy /api/run response shape so
+        // populateDashboard can be reused unchanged.
+        const accumulated = {
+            job_analysis: null,
+            fit_evaluation: null,
+            tailored_resume: null,
+            cover_letter: null,
+            interview_prep: null,
+            tailored_resume_pdf_available: false,
+        };
+
+        let response;
         try {
-            const response = await fetch("/api/run", {
+            response = await fetch("/api/run/stream", {
                 method: "POST",
-                body: formData
+                body: formData,
             });
-
-            const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.message || "Failed to execute orchestration pipeline.");
-            }
-
-            animateLogStreaming(data);
-
         } catch (error) {
             console.error(error);
             setStatus("error", "Error");
             addLogLine("error", `[Critical Error] ${error.message}`);
             setNodeError();
-            btnSubmit.disabled = false;
-            btnSubmit.innerHTML = `<i class="fa-solid fa-play"></i> Run Orchestration Pipeline`;
+            finishRun();
+            return;
         }
+
+        if (!response.ok) {
+            let detail = "Failed to execute orchestration pipeline.";
+            try {
+                const body = await response.json();
+                detail = body.detail || body.message || detail;
+            } catch (_) {}
+            setStatus("error", "Error");
+            addLogLine("error", `[Critical Error] ${detail}`);
+            setNodeError();
+            finishRun();
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let sawError = false;
+        let terminated = false;
+        let done = false;
+
+        function handleEvent(eventName, payload) {
+            switch (eventName) {
+                case "log": {
+                    const msg = payload.message || "";
+                    let type = "system";
+                    if (/Agent \d/.test(msg)) type = "agent";
+                    else if (/successfully|Complete/i.test(msg)) type = "success";
+                    addLogLine(type, msg);
+                    break;
+                }
+                case "stage": {
+                    const node = STAGE_NODES[payload.name];
+                    if (!node) break;
+                    if (payload.status === "active") {
+                        setNodeActive(node);
+                    } else if (payload.status === "completed") {
+                        setNodeCompleted(node);
+                        const conn = STAGE_CONNECTOR_AFTER[payload.name];
+                        if (conn) setConnectorActive(conn);
+                    } else if (payload.status === "error") {
+                        node.className = "agent-node active error";
+                    }
+                    break;
+                }
+                case "result":
+                    accumulated[payload.key] = payload.value;
+                    break;
+                case "terminated":
+                    terminated = true;
+                    break;
+                case "error":
+                    sawError = true;
+                    addLogLine("error", `[Critical Error] ${payload.message}`);
+                    setNodeError();
+                    break;
+                case "done":
+                    done = true;
+                    break;
+            }
+        }
+
+        function drainBuffer() {
+            let idx;
+            while ((idx = buffer.indexOf("\n\n")) >= 0) {
+                const raw = buffer.slice(0, idx);
+                buffer = buffer.slice(idx + 2);
+                if (!raw.trim()) continue;
+                let eventName = "message";
+                let dataLine = "";
+                for (const line of raw.split("\n")) {
+                    if (line.startsWith("event:")) {
+                        eventName = line.slice(6).trim();
+                    } else if (line.startsWith("data:")) {
+                        dataLine += line.slice(5).trim();
+                    }
+                }
+                let payload = {};
+                if (dataLine) {
+                    try { payload = JSON.parse(dataLine); } catch (_) {}
+                }
+                handleEvent(eventName, payload);
+            }
+        }
+
+        try {
+            while (true) {
+                const { value, done: streamDone } = await reader.read();
+                if (streamDone) break;
+                buffer += decoder.decode(value, { stream: true });
+                drainBuffer();
+            }
+            buffer += decoder.decode();
+            drainBuffer();
+        } catch (error) {
+            console.error(error);
+            setStatus("error", "Error");
+            addLogLine("error", `[Critical Error] ${error.message}`);
+            setNodeError();
+            finishRun();
+            return;
+        }
+
+        if (sawError) {
+            setStatus("error", "Error");
+            finishRun();
+            return;
+        }
+
+        if (done || terminated) {
+            setStatus("success", terminated ? "Terminated" : "Completed");
+            populateDashboard(accumulated);
+        }
+        finishRun();
     }
 
     function resetVisualizer() {
@@ -199,53 +326,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (activeNode) {
             activeNode.className = "agent-node active error";
         }
-    }
-
-    function animateLogStreaming(data) {
-        let index = 0;
-        const apiLogs = data.logs || [];
-        
-        function nextLog() {
-            if (index < apiLogs.length) {
-                const logMsg = apiLogs[index];
-                
-                let logType = "system";
-                if (logMsg.includes("Agent 1") || logMsg.includes("Ingestion")) {
-                    setNodeActive(nodeIngestion);
-                    logType = "agent";
-                } else if (logMsg.includes("Agent 2") || logMsg.includes("Evaluator") || logMsg.includes("Evaluation")) {
-                    setNodeCompleted(nodeIngestion);
-                    setConnectorActive(conn1);
-                    setNodeActive(nodeEvaluator);
-                    logType = "agent";
-                } else if (logMsg.includes("Agent 3") || logMsg.includes("Tailor") || logMsg.includes("Tailoring")) {
-                    setNodeCompleted(nodeEvaluator);
-                    setConnectorActive(conn2);
-                    setNodeActive(nodeTailor);
-                    logType = "agent";
-                } else if (logMsg.includes("Agent 4") || logMsg.includes("Coach") || logMsg.includes("Coaching")) {
-                    setNodeCompleted(nodeTailor);
-                    setConnectorActive(conn3);
-                    setNodeActive(nodeCoach);
-                    logType = "agent";
-                } else if (logMsg.includes("successfully") || logMsg.includes("Complete")) {
-                    logType = "success";
-                }
-
-                addLogLine(logType, logMsg);
-                index++;
-                setTimeout(nextLog, 500); 
-            } else {
-                setNodeCompleted(nodeCoach);
-                setStatus("success", "Completed");
-                btnSubmit.disabled = false;
-                btnSubmit.innerHTML = `<i class="fa-solid fa-play"></i> Run Orchestration Pipeline`;
-                
-                populateDashboard(data);
-            }
-        }
-        
-        nextLog();
     }
 
     // 5. Job Discovery search event handlers
@@ -393,6 +473,7 @@ ${job.url}
     const dashGapsList = document.getElementById("dash-gaps-list");
     
     const resumePre = document.querySelector("#resume-pre code");
+    const btnDownloadResumePdf = document.getElementById("btn-download-resume-pdf");
     const coverLetterDiv = document.getElementById("coverletter-div");
     const coachQuestionsDiv = document.getElementById("coach-questions-div");
 
@@ -467,6 +548,11 @@ ${job.url}
         // Text previews
         if (data.tailored_resume) {
             resumePre.textContent = data.tailored_resume;
+        }
+
+        if (btnDownloadResumePdf) {
+            btnDownloadResumePdf.style.display =
+                data.tailored_resume_pdf_available ? "inline-flex" : "none";
         }
 
         if (data.cover_letter) {
