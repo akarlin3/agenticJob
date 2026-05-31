@@ -127,10 +127,12 @@ This generates `master_portfolio.pdf` in the workspace root.
 > web UI, or by replacing `master_portfolio.pdf` and configuring your `.env`
 > (which is git-ignored).
 
-### 4. Configure API Keys
-Edit the `.env` file in the project root:
+### 4. Configure API Keys (optional)
+Copy the template and add any keys you have. This step is **optional** — with
+keys blank the pipeline runs in mock mode, so the app boots without it:
 ```bash
-# Open and edit .env to add your keys:
+cp .env.example .env
+# Then open .env and add your keys:
 GEMINI_API_KEY=AIzaSy...
 ANTHROPIC_API_KEY=sk-ant-api03...
 ```
@@ -153,12 +155,15 @@ A `Dockerfile` and `docker-compose.yml` are bundled for a one-command deploy:
 ```bash
 docker compose up --build
 ```
-The container exposes the FastAPI app on port 8000 (`/api/health` returns
-`{"status": "healthy"}`) and reads `GEMINI_API_KEY`/`ANTHROPIC_API_KEY` from a
-local `.env` (mock mode runs without keys). To build the image directly:
+No `.env` is required — Compose treats it as optional and the app boots in mock
+mode without keys. To run with live APIs, `cp .env.example .env` first and add
+your keys; the container reads `GEMINI_API_KEY`/`ANTHROPIC_API_KEY` from it. The
+container exposes the FastAPI app on port 8000 (`/api/health` returns
+`{"status": "healthy"}`). To build the image directly:
 ```bash
 docker build -t agenticjob .
-docker run --rm -p 8000:8000 --env-file .env agenticjob
+docker run --rm -p 8000:8000 agenticjob            # mock mode, no keys
+docker run --rm -p 8000:8000 --env-file .env agenticjob   # with your keys
 ```
 
 > **Scope note:** the image runs a single uvicorn worker because the pipeline
