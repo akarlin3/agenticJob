@@ -56,6 +56,22 @@ jobs:
             echo "Found artifact: $f"
           done
 
+      - name: Install Tectonic (LaTeX compiler)
+        if: matrix.python-version == '3.12'
+        run: |
+          set -e
+          curl -fsSL https://drop-sh.fullyjustified.net/x86_64-unknown-linux-musl/install.sh | sh
+          sudo mv tectonic /usr/local/bin/tectonic
+          tectonic --version
+
+      - name: Compile tailored LaTeX resume to PDF
+        if: matrix.python-version == '3.12'
+        run: |
+          set -e
+          tectonic --keep-logs --outdir output output/tailored_resume.tex
+          test -s output/tailored_resume.pdf
+          echo "Successfully compiled tailored_resume.tex -> tailored_resume.pdf"
+
       - name: Upload generated artifacts
         if: always()
         uses: actions/upload-artifact@v4

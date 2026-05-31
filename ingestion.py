@@ -1,11 +1,33 @@
+import logging
 import os
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 # Load environment variables
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+
+# Retry policy for Gemini calls: up to 3 attempts with exponential backoff,
+# retrying on transient network/server errors. The google-genai SDK does not
+# expose a stable narrow exception hierarchy across versions, so we retry on
+# a broad Exception class but cap attempts tightly to avoid amplifying
+# permanent failures.
+_gemini_retry = retry(
+    reraise=True,
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    retry=retry_if_exception_type(Exception),
+)
 
 # Define the Pydantic schema for structured output
 class JobAnalysis(BaseModel):
@@ -20,7 +42,7 @@ def ingest_job_description(job_description: str, mock: bool = False) -> JobAnaly
     using Gemini 2.5 Flash and Pydantic structured output.
     """
     if mock:
-        print("[Mock Mode] Bypassing Gemini Ingestion API...")
+        logger.info("[Mock Mode] Bypassing Gemini Ingestion API...")
         return JobAnalysis(
             role_title="Senior Full Stack AI Orchestration Engineer (FinTech / SaaS)",
             required_tech_stack=["Python", "FastAPI", "React", "PostgreSQL", "Docker", "AWS", "Terraform", "GCP", "PyTorch"],
@@ -48,17 +70,20 @@ def ingest_job_description(job_description: str, mock: bool = False) -> JobAnaly
     \"\"\"
     """
     
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=JobAnalysis,
-            system_instruction="You are an expert technical recruiter and talent advisor. Extract clear, structured attributes from the provided job description.",
-            temperature=0.1,
-        ),
-    )
-    
+    @_gemini_retry
+    def _call():
+        return client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=JobAnalysis,
+                system_instruction="You are an expert technical recruiter and talent advisor. Extract clear, structured attributes from the provided job description.",
+                temperature=0.1,
+            ),
+        )
+
+    response = _call()
     return response.parsed
 
 if __name__ == "__main__":

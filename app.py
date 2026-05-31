@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import json
@@ -13,6 +14,12 @@ from tailor import tailor_application_materials
 from coach import generate_interview_prep
 from create_portfolio import generate_portfolio
 from searcher import search_jobs
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Multi-Agent Job Search Pipeline API")
 
@@ -55,7 +62,7 @@ async def run_search(
     except Exception as e:
         # Surface the actionable error from search_jobs (e.g. the
         # "no provider configured" RuntimeError) as the detail.
-        print(f"Error in search API: {e}")
+        logger.error("Error in search API: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/run")
@@ -66,7 +73,9 @@ async def run_pipeline(
 ):
     logs = []
     def log(msg: str):
-        print(f"[Web Pipeline] {msg}")
+        # Log *and* append — the frontend reads `logs` from the response,
+        # while operators read structured stderr logs.
+        logger.info("[Web Pipeline] %s", msg)
         logs.append(msg)
 
     log("Initializing Hybrid Multi-Agent Job Search Pipeline...")

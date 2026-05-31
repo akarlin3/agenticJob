@@ -3,6 +3,8 @@
 No network, no API keys — exercises the pure-logic helpers, the mock search
 path, schema validation, and the malformed-row-dropped behaviour.
 """
+import pytest
+
 from searcher import _dedupe_key, _truncate, search_jobs, DiscoveredJob
 
 
@@ -71,9 +73,21 @@ class TestMalformedRowHandling:
         # 'url' is required by DiscoveredJob; omit it to force a validation drop.
         bad = {"title": "Broken", "company": "NoUrl Co"}
 
+        # Mark a provider as configured so the live path proceeds past the
+        # "no provider configured" guard and exercises the monkeypatched calls.
+        monkeypatch.setenv("RAPIDAPI_KEY", "test-dummy")
         monkeypatch.setattr("searcher._search_jsearch", lambda *a, **k: [good, bad])
         monkeypatch.setattr("searcher._search_adzuna", lambda *a, **k: [])
 
         result = search_jobs("q", "loc", mock=False)
         assert len(result) == 1
         assert result[0]["company"] == "Example Labs"
+
+
+class TestNoProviderConfigured:
+    def test_live_path_raises_when_no_provider_env_vars_set(self, monkeypatch):
+        """Live path must fail fast with an actionable RuntimeError, not return []."""
+        for var in ("RAPIDAPI_KEY", "ADZUNA_APP_ID", "ADZUNA_APP_KEY"):
+            monkeypatch.delenv(var, raising=False)
+        with pytest.raises(RuntimeError, match="No job search provider configured"):
+            search_jobs("python", "NYC", mock=False)
