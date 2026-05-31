@@ -1,15 +1,12 @@
 import logging
-import os
-from dotenv import load_dotenv
 import anthropic
+
+from config import settings
 
 logger = logging.getLogger(__name__)
 
 # Synthetic demo persona — not a real individual (see sample_data.py).
 import sample_data
-
-# Load environment variables
-load_dotenv()
 
 def generate_interview_prep(job_details_json: str, gap_analysis_json: str, mock: bool = False) -> list[dict]:
     """
@@ -53,7 +50,7 @@ def generate_interview_prep(job_details_json: str, gap_analysis_json: str, mock:
             }
         ]
 
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = settings.anthropic_api_key
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY environment variable is not set. Please set it in your .env file.")
         
@@ -109,7 +106,7 @@ def generate_interview_prep(job_details_json: str, gap_analysis_json: str, mock:
     
     logger.info("Calling Claude 3.5 Sonnet to generate interview coach preparation guide...")
     response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model=settings.claude_model,
         max_tokens=2500,
         system=system_prompt,
         messages=[

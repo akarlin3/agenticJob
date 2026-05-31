@@ -146,6 +146,28 @@ Open **[http://localhost:8000](http://localhost:8000)** in your web browser. You
 
 ---
 
+## Run with Docker
+
+A `Dockerfile` and `docker-compose.yml` are bundled for a one-command deploy:
+```bash
+docker compose up --build
+```
+The container exposes the FastAPI app on port 8000 (`/api/health` returns
+`{"status": "healthy"}`) and reads `GEMINI_API_KEY`/`ANTHROPIC_API_KEY` from a
+local `.env` (mock mode runs without keys). To build the image directly:
+```bash
+docker build -t agenticjob .
+docker run --rm -p 8000:8000 --env-file .env agenticjob
+```
+
+> **Scope note:** the image runs a single uvicorn worker because the pipeline
+> writes shared state (`master_portfolio.pdf`, `output/*.json`) to the
+> container filesystem — fine for a single-user tool. A public, multi-tenant
+> deploy would additionally require auth, rate limiting, and per-run output
+> isolation; those are intentionally out of scope here.
+
+---
+
 ## Running the CLI Pipeline
 
 ### Safe Local Dry-Run (Validation Mode)

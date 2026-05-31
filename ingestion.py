@@ -1,6 +1,4 @@
 import logging
-import os
-from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
@@ -11,8 +9,7 @@ from tenacity import (
     wait_exponential,
 )
 
-# Load environment variables
-load_dotenv()
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +52,10 @@ def ingest_job_description(job_description: str, mock: bool = False) -> JobAnaly
             domain_expertise=["FinTech", "SaaS", "Payment Processing"]
         )
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = settings.gemini_api_key
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable is not set. Please set it in your .env file.")
-        
+
     client = genai.Client(api_key=api_key)
     
     prompt = f"""
@@ -73,7 +70,7 @@ def ingest_job_description(job_description: str, mock: bool = False) -> JobAnaly
     @_gemini_retry
     def _call():
         return client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=settings.gemini_flash_model,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",

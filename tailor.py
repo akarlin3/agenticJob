@@ -1,16 +1,13 @@
 import logging
-import os
-from dotenv import load_dotenv
 import anthropic
+
+from config import settings
 
 logger = logging.getLogger(__name__)
 
 # Synthetic demo persona — not a real individual. Mock outputs are built from the
 # single source of truth in sample_data.py.
 import sample_data
-
-# Load environment variables
-load_dotenv()
 
 def tailor_application_materials(job_details_json: str, gap_analysis_json: str, mock: bool = False) -> tuple[str, str]:
     """
@@ -80,7 +77,7 @@ Sincerely,
 
         return latex_mock, cover_letter_mock
 
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = settings.anthropic_api_key
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY environment variable is not set. Please set it in your .env file.")
         
@@ -142,7 +139,7 @@ Sincerely,
     
     logger.info("Calling Claude 3.5 Sonnet to generate tailored application materials with forced tool use...")
     response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model=settings.claude_model,
         max_tokens=4000,
         system=system_prompt,
         messages=[
