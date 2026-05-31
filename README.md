@@ -14,9 +14,10 @@ The pipeline combines the strengths of **Google GenAI** (Gemini 2.5) and **Anthr
 This system comes with an interactive, fully functional **Single Page Web Application** featuring:
 - **Responsive Layout**: Designed using a curated modern glassmorphism aesthetic with custom HSL styling and glow orbs.
 - **Drag-and-Drop PDF Upload**: Interactively upload your latest `master_portfolio.pdf` directly from the browser.
-- **Real-Time Log Monitor**: Watch as the orchestrator spins up each agent sequentially with terminal-style logs.
+- **Real-Time Log Monitor**: Logs and agent-node transitions are streamed live from the backend over Server-Sent Events (`POST /api/run/stream`) — what you see in the console mirrors what the pipeline is doing at that moment, not a post-hoc replay.
 - **Dynamic Dashboard**: Includes an animated matching gauge, fit scores, and critical gap breakdowns.
 - **Side-by-Side Previews**: View the customized LaTeX resume source, full cover letter markdown, and coach strategy cards side-by-side with instant clipboard copies and file download links.
+- **One-Click PDF Download**: When Tectonic is available on the host (it is, in the bundled Docker image), the tailored LaTeX resume is server-side-compiled to PDF and exposed via `GET /api/download/resume-pdf` alongside the `.tex` source.
 
 ![Mock-mode dashboard: match-fit gauge, agent visualizer, and gap analysis](docs/media/dashboard-mock.png)
 

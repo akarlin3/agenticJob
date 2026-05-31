@@ -13,6 +13,17 @@ WORKDIR /app
 
 RUN groupadd --system app && useradd --system --gid app --home /app app
 
+# Tectonic compiles tailored_resume.tex -> .pdf inside the container so the
+# web UI can offer a one-click PDF download. curl + ca-certificates are
+# needed for the installer; we leave them in the image so Tectonic can fetch
+# missing TeX packages on first compile.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && curl -fsSL https://drop-sh.fullyjustified.net/x86_64-unknown-linux-musl/install.sh | sh \
+    && mv tectonic /usr/local/bin/tectonic \
+    && tectonic --version \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
