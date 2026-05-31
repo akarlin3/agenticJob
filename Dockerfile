@@ -15,10 +15,14 @@ RUN groupadd --system app && useradd --system --gid app --home /app app
 
 # Tectonic compiles tailored_resume.tex -> .pdf inside the container so the
 # web UI can offer a one-click PDF download. curl + ca-certificates are
-# needed for the installer; we leave them in the image so Tectonic can fetch
-# missing TeX packages on first compile.
+# needed for the installer; the lib* packages are the shared libraries the
+# prebuilt Tectonic binary dynamically links against (graphite2, harfbuzz,
+# fontconfig, freetype, icu). We leave curl in the image so Tectonic can
+# fetch missing TeX packages on first compile.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && apt-get install -y --no-install-recommends \
+        curl ca-certificates \
+        libgraphite2-3 libharfbuzz0b libfontconfig1 libfreetype6 libicu76 \
     && curl -fsSL https://drop-sh.fullyjustified.net/x86_64-unknown-linux-musl/install.sh | sh \
     && mv tectonic /usr/local/bin/tectonic \
     && tectonic --version \
