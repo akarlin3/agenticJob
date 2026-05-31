@@ -9,6 +9,34 @@ logger = logging.getLogger(__name__)
 # single source of truth in sample_data.py.
 import sample_data
 
+# LaTeX reserved characters that must be escaped when raw text (e.g. the persona
+# fields from sample_data.py, which are also consumed by the reportlab PDF where
+# these characters are literal) is interpolated into the LaTeX source. Without
+# this, values like "...Engineer & Full Stack Developer" or "$1M ..." abort the
+# Tectonic/pdfLaTeX compile ("Misplaced alignment tab" / "Missing $ inserted").
+_LATEX_ESCAPES = {
+    "\\": r"\textbackslash{}",
+    "&": r"\&",
+    "%": r"\%",
+    "$": r"\$",
+    "#": r"\#",
+    "_": r"\_",
+    "{": r"\{",
+    "}": r"\}",
+    "~": r"\textasciitilde{}",
+    "^": r"\textasciicircum{}",
+}
+
+
+def _latex_escape(text: str) -> str:
+    """Escape LaTeX reserved characters in a plain-text value.
+
+    Backslash is handled first via the dict ordering (Python 3.7+ preserves
+    insertion order) so the replacements it introduces are not re-escaped.
+    """
+    return "".join(_LATEX_ESCAPES.get(ch, ch) for ch in text)
+
+
 def tailor_application_materials(job_details_json: str, gap_analysis_json: str, mock: bool = False) -> tuple[str, str]:
     """
     Sends job details, gap analysis, and optionally the master portfolio details to Claude 3.5 Sonnet.
@@ -18,6 +46,18 @@ def tailor_application_materials(job_details_json: str, gap_analysis_json: str, 
     if mock:
         logger.info("[Mock Mode] Bypassing Claude Resume/Cover Letter Customization API...")
         # Synthetic demo persona — not a real individual (see sample_data.py).
+        # Escape the interpolated fields so LaTeX reserved characters (the "&" in
+        # the title, the "$" in the payment volume) don't break compilation.
+        name = _latex_escape(sample_data.PERSONA_NAME)
+        title = _latex_escape(sample_data.PERSONA_TITLE)
+        location = _latex_escape(sample_data.PERSONA_LOCATION)
+        email = _latex_escape(sample_data.PERSONA_EMAIL)
+        phone = _latex_escape(sample_data.PERSONA_PHONE)
+        company_current = _latex_escape(sample_data.COMPANY_CURRENT)
+        company_previous = _latex_escape(sample_data.COMPANY_PREVIOUS)
+        throughput = _latex_escape(sample_data.THROUGHPUT_PROMPTS)
+        payment_volume = _latex_escape(sample_data.PAYMENT_VOLUME)
+
         latex_mock = r"""\documentclass{article}
 \usepackage{geometry}
 \usepackage{hyperref}
@@ -25,11 +65,11 @@ def tailor_application_materials(job_details_json: str, gap_analysis_json: str, 
 \begin{document}
 
 \begin{center}
-    {\Huge \textbf{""" + sample_data.PERSONA_NAME + r"""}} \\
+    {\Huge \textbf{""" + name + r"""}} \\
     \vspace{2pt}
-    """ + sample_data.PERSONA_TITLE + r""" \\
+    """ + title + r""" \\
     \vspace{2pt}
-    """ + sample_data.PERSONA_LOCATION + " | " + sample_data.PERSONA_EMAIL + " | " + sample_data.PERSONA_PHONE + r"""
+    """ + location + " | " + email + " | " + phone + r"""
 \end{center}
 
 \section*{Professional Summary}
@@ -44,17 +84,17 @@ Software engineer specializing in the design, development, and scaling of hybrid
 
 \section*{Professional Experience}
 \textbf{Lead AI \& Backend Systems Engineer} \hfill 2023 -- Present \\
-\textit{""" + sample_data.COMPANY_CURRENT + r"""}
+\textit{""" + company_current + r"""}
 \begin{itemize}
-    \item Engineered a hybrid multi-agent workspace routing pipeline utilizing Gemini and Claude models, handling """ + sample_data.THROUGHPUT_PROMPTS + r""" in load tests.
+    \item Engineered a hybrid multi-agent workspace routing pipeline utilizing Gemini and Claude models, handling """ + throughput + r""" in load tests.
     \item Implemented structured data ingestion and semantic search pipelines, improving vector indexing (PostgreSQL pgvector) and prompt latency.
     \item Built and deployed infrastructure using AWS ECS, Kubernetes, and Docker, provisioning with Terraform.
 \end{itemize}
 
 \textbf{Senior Full Stack Developer} \hfill 2020 -- 2023 \\
-\textit{""" + sample_data.COMPANY_PREVIOUS + r"""}
+\textit{""" + company_previous + r"""}
 \begin{itemize}
-    \item Developed payment APIs in Django and PostgreSQL processing """ + sample_data.PAYMENT_VOLUME + r""" in a sandbox environment, with query tuning and connection pooling.
+    \item Developed payment APIs in Django and PostgreSQL processing """ + payment_volume + r""" in a sandbox environment, with query tuning and connection pooling.
     \item Led migration of legacy user interfaces to a modern React + Next.js platform, improving Core Web Vitals.
 \end{itemize}
 
