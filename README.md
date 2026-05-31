@@ -199,6 +199,7 @@ Every push and pull request is validated by GitHub Actions (see [`.github/workfl
 4. Generates the `master_portfolio.pdf` via `create_portfolio.py`.
 5. Runs the full orchestration pipeline in `--mock` mode as an end-to-end smoke test.
 6. Verifies that all expected output artifacts (`job_analysis.json`, `fit_evaluation.json`, `tailored_resume.tex`, `cover_letter.md`, `interview_prep.md`) are produced and non-empty.
+7. Compiles `output/tailored_resume.tex` to PDF using [Tectonic](https://tectonic-typesetting.github.io/) (Python 3.12 entry only) to enforce the "compilation-ready" guarantee on the generated LaTeX.
 
 Because the tests and smoke test run in mock mode, **no API keys or billing are required** for CI to pass.
 

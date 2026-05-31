@@ -1,6 +1,9 @@
+import logging
 import os
 from dotenv import load_dotenv
 import anthropic
+
+logger = logging.getLogger(__name__)
 
 # Synthetic demo persona — not a real individual. Mock outputs are built from the
 # single source of truth in sample_data.py.
@@ -16,7 +19,7 @@ def tailor_application_materials(job_details_json: str, gap_analysis_json: str, 
     Returns (latex_resume, markdown_cover_letter).
     """
     if mock:
-        print("[Mock Mode] Bypassing Claude Resume/Cover Letter Customization API...")
+        logger.info("[Mock Mode] Bypassing Claude Resume/Cover Letter Customization API...")
         # Synthetic demo persona — not a real individual (see sample_data.py).
         latex_mock = r"""\documentclass{article}
 \usepackage{geometry}
@@ -81,7 +84,9 @@ Sincerely,
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY environment variable is not set. Please set it in your .env file.")
         
-    client = anthropic.Anthropic(api_key=api_key)
+    # SDK-native retry + timeout: 3 retries with exponential backoff on
+    # transient errors (timeouts, 429s, 5xx), 60s per-request timeout.
+    client = anthropic.Anthropic(api_key=api_key, max_retries=3, timeout=60.0)
     
     tools = [
         {
@@ -135,7 +140,7 @@ Sincerely,
     Please generate the tailored resume and cover letter.
     """
     
-    print("Calling Claude 3.5 Sonnet to generate tailored application materials with forced tool use...")
+    logger.info("Calling Claude 3.5 Sonnet to generate tailored application materials with forced tool use...")
     response = client.messages.create(
         model="claude-3-5-sonnet-20241022",
         max_tokens=4000,

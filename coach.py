@@ -1,6 +1,9 @@
+import logging
 import os
 from dotenv import load_dotenv
 import anthropic
+
+logger = logging.getLogger(__name__)
 
 # Synthetic demo persona — not a real individual (see sample_data.py).
 import sample_data
@@ -16,7 +19,7 @@ def generate_interview_prep(job_details_json: str, gap_analysis_json: str, mock:
     Returns a list of structured question dictionaries.
     """
     if mock:
-        print("[Mock Mode] Bypassing Claude Interview Coaching API...")
+        logger.info("[Mock Mode] Bypassing Claude Interview Coaching API...")
         return [
             {
                 "question": f"Can you walk us through the architectural design of the hybrid multi-agent routing system you built at {sample_data.COMPANY_CURRENT}? How did you delegate tasks between Gemini and Claude?",
@@ -54,7 +57,9 @@ def generate_interview_prep(job_details_json: str, gap_analysis_json: str, mock:
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY environment variable is not set. Please set it in your .env file.")
         
-    client = anthropic.Anthropic(api_key=api_key)
+    # SDK-native retry + timeout: 3 retries with exponential backoff on
+    # transient errors (timeouts, 429s, 5xx), 60s per-request timeout.
+    client = anthropic.Anthropic(api_key=api_key, max_retries=3, timeout=60.0)
     
     tools = [
         {
@@ -102,7 +107,7 @@ def generate_interview_prep(job_details_json: str, gap_analysis_json: str, mock:
     Please generate 5-6 extremely relevant interview questions (mix of technical and behavioral) that the candidate should prepare for, especially focusing on how to defend their technical gaps.
     """
     
-    print("Calling Claude 3.5 Sonnet to generate interview coach preparation guide...")
+    logger.info("Calling Claude 3.5 Sonnet to generate interview coach preparation guide...")
     response = client.messages.create(
         model="claude-3-5-sonnet-20241022",
         max_tokens=2500,

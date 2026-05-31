@@ -30,6 +30,7 @@ fields did nothing functional and were a security liability.
 # imports cleanly on Python 3.9, which is part of the CI matrix.
 from __future__ import annotations
 
+import logging
 import os
 import re
 import time
@@ -38,6 +39,8 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 JSEARCH_HOST = "jsearch.p.rapidapi.com"
 JSEARCH_URL = f"https://{JSEARCH_HOST}/search"
@@ -71,6 +74,15 @@ def _dedupe_key(job: dict) -> str:
 def _truncate(text: str, limit: int = 320) -> str:
     text = re.sub(r"\s+", " ", text or "").strip()
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def _any_provider_configured() -> bool:
+    """True if at least one search provider has credentials in the environment."""
+    if os.getenv("RAPIDAPI_KEY"):
+        return True
+    if os.getenv("ADZUNA_APP_ID") and os.getenv("ADZUNA_APP_KEY"):
+        return True
+    return False
 
 
 # --------------------------------------------------------------------------- #
@@ -107,7 +119,7 @@ def _search_jsearch(
 
     headers = {"X-RapidAPI-Key": api_key, "X-RapidAPI-Host": JSEARCH_HOST}
 
-    print(f"[Search Agent] JSearch query: '{q}' (date_posted={params['date_posted']})")
+    logger.info("[Search Agent] JSearch query: '%s' (date_posted=%s)", q, params["date_posted"])
     resp = requests.get(JSEARCH_URL, headers=headers, params=params, timeout=25)
     resp.raise_for_status()
     data = resp.json().get("data") or []
@@ -163,7 +175,7 @@ def _search_adzuna(
         params["max_days_old"] = str(days)
 
     url = ADZUNA_URL.format(country=country)
-    print(f"[Search Agent] Adzuna fallback query: '{query}' in '{location}'")
+    logger.info("[Search Agent] Adzuna fallback query: '%s' in '%s'", query, location)
     resp = requests.get(url, params=params, timeout=25)
     resp.raise_for_status()
     results = resp.json().get("results") or []
@@ -206,14 +218,23 @@ def search_jobs(
     on the real posting rather than a teaser snippet.
     """
     platforms = platforms or []
-    print(
-        f"[Search Agent] query='{query}' location='{location}' "
-        f"platforms={platforms} remote={remote}"
+    logger.info(
+        "[Search Agent] query='%s' location='%s' platforms=%s remote=%s",
+        query, location, platforms, remote,
     )
 
     if mock:
-        print("[Search Agent] [Mock Mode] Returning simulated results...")
+        logger.info("[Search Agent] [Mock Mode] Returning simulated results...")
         return _mock_results(location)
+
+    # Fail fast with an actionable error when nothing is configured, instead of
+    # silently returning [] (which would look identical to "no results found").
+    if not _any_provider_configured():
+        raise RuntimeError(
+            "No job search provider configured. "
+            "Set RAPIDAPI_KEY (JSearch) and/or ADZUNA_APP_ID + ADZUNA_APP_KEY "
+            "in your environment, or call search_jobs(..., mock=True)."
+        )
 
     errors = []
     jobs: list[dict] = []
@@ -224,10 +245,10 @@ def search_jobs(
     except requests.HTTPError as e:
         code = e.response.status_code if e.response is not None else "?"
         errors.append(f"JSearch HTTP {code}")
-        print(f"[Search Agent] JSearch failed (HTTP {code}); trying fallback.")
+        logger.warning("[Search Agent] JSearch failed (HTTP %s); trying fallback.", code)
     except Exception as e:
         errors.append(f"JSearch: {e}")
-        print(f"[Search Agent] JSearch error: {e}; trying fallback.")
+        logger.warning("[Search Agent] JSearch error: %s; trying fallback.", e)
 
     # 2) Fallback: Adzuna (only if primary returned nothing)
     if not jobs:
@@ -260,9 +281,9 @@ def search_jobs(
         try:
             clean.append(DiscoveredJob(**j).model_dump())
         except Exception as e:
-            print(f"[Search Agent] Dropping malformed result: {e}")
+            logger.warning("[Search Agent] Dropping malformed result: %s", e)
 
-    print(f"[Search Agent] Returning {len(clean)} jobs.")
+    logger.info("[Search Agent] Returning %d jobs.", len(clean))
     return clean
 
 
