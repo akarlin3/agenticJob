@@ -166,6 +166,20 @@ docker run --rm -p 8000:8000 agenticjob            # mock mode, no keys
 docker run --rm -p 8000:8000 --env-file .env agenticjob   # with your keys
 ```
 
+The one-click PDF download relies on [Tectonic](https://tectonic-typesetting.github.io/),
+which the build downloads from a third-party host. That download is **best-effort**:
+if it fails (offline build, host down), the image still builds and the app runs —
+the resume `.tex` source stays downloadable, only the server-side PDF render is
+skipped. So `docker compose up --build` always produces a working container.
+
+> **Behind a TLS-intercepting proxy?** Corporate networks and some sandboxed
+> build environments terminate TLS with a private root CA, which breaks every
+> HTTPS download in the build (`pip` and Tectonic) with *"self-signed
+> certificate in certificate chain"*. Drop your proxy's root CA into
+> [`certs/`](certs/) as a `.crt` file and rebuild — the Dockerfile trusts it
+> before any download runs. On a normal network `certs/` stays empty and is a
+> no-op. See [`certs/README.md`](certs/README.md).
+
 > **Scope note:** the image runs a single uvicorn worker because the pipeline
 > writes shared state (`master_portfolio.pdf`, `output/*.json`) to the
 > container filesystem — fine for a single-user tool. A public, multi-tenant
