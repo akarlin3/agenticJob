@@ -11,3 +11,7 @@ __pycache__/
 # Dynamically generated assets & outputs
 master_portfolio.pdf
 output/
+
+# Extra CA certs for TLS-intercepting proxies are environment-specific.
+# Keep the placeholder + README tracked; ignore any real cert dropped in.
+certs/*.crt
