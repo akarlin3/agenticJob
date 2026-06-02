@@ -58,13 +58,39 @@ class CandidateSearchProfile(BaseModel):
         "technologies (languages, frameworks, tools, domains).",
     )
     suggested_query: str = Field(
-        description="A single, clean job-board search query string built from the "
-        "candidate's strongest titles and skills, suited to a keyword search API.",
+        description="A SHORT, PLAIN job-board search query: the single best-fit "
+        "target job title only (e.g. 'Computational Physicist'), 2-5 words. NO "
+        "boolean operators (AND/OR), NO parentheses, NO quotes. Keyword job-board "
+        "APIs treat these as literal text and return nothing; recall comes from a "
+        "broad query, precision from re-ranking against titles + skills.",
     )
 
 
 # Token used to split skills/titles into comparable lowercase words for ranking.
 _WORD_RE = re.compile(r"[a-z0-9+#.]+")
+
+# Boolean syntax that JSearch / Adzuna treat as literal text rather than search
+# operators. We strip these defensively so a stray boolean query still degrades
+# to a plain keyword string. Cap the final query to a handful of words: a broad
+# query maximizes recall, and rank_jobs() supplies the precision.
+_BOOLEAN_TOKENS = {"and", "or", "not"}
+_QUERY_MAX_WORDS = 6
+
+
+def _plainify_query(text: str) -> str:
+    """Reduce ``text`` to a short, plain keyword string.
+
+    Removes boolean operators (AND/OR/NOT), parentheses and double quotes,
+    collapses whitespace, and caps the result at ``_QUERY_MAX_WORDS`` words.
+    Keyword job-board APIs have no boolean support, so anything fancier just
+    fails to match — this guarantees a clean string even if the LLM ignores the
+    "plain phrase" instruction.
+    """
+    # Drop parentheses and quote characters outright.
+    cleaned = re.sub(r'[()"]', " ", text or "")
+    # Keep only non-operator tokens, preserving order, then cap the length.
+    words = [w for w in cleaned.split() if w.lower() not in _BOOLEAN_TOKENS]
+    return " ".join(words[:_QUERY_MAX_WORDS])
 
 
 def _mock_profile() -> CandidateSearchProfile:
@@ -91,8 +117,9 @@ def _mock_profile() -> CandidateSearchProfile:
         "Full Stack Engineer",
     ]
 
-    # A compact query: the lead title plus a handful of the strongest skills.
-    query = f"{sample_data.PERSONA_TITLE} {' '.join(core_skills[:6])}".strip()
+    # A SHORT, PLAIN query: the single best-fit target title, no operators. Recall
+    # comes from this broad query; rank_jobs() re-ranks against titles + skills.
+    query = _plainify_query("AI Engineer")
 
     return CandidateSearchProfile(
         suggested_titles=suggested_titles,
@@ -130,9 +157,15 @@ def extract_search_profile(
 
     prompt = f"""
     Analyze the following candidate resume / portfolio text and produce a concise
-    job-search profile. Identify the job titles this person should search for, the
-    strongest and most marketable skills/technologies they have, and a single clean
-    search-query string (titles + key skills) suited to a job-board keyword search.
+    job-search profile. Identify the job titles this person should search for and
+    the strongest and most marketable skills/technologies they have.
+
+    For ``suggested_query``, output a SHORT, PLAIN search phrase: the SINGLE
+    best-fit target job title only (e.g. "Computational Physicist"), 2-5 words.
+    Do NOT use boolean operators (AND/OR), parentheses, quotes, or combine
+    multiple titles/skills — keyword job-board APIs treat those as literal text
+    and return zero results. Keep it broad; downstream re-ranking handles
+    precision.
 
     Focus on what the candidate is genuinely strong in; do not invent skills that
     are not supported by the text.
@@ -168,23 +201,27 @@ def build_search_query(
 ) -> str:
     """Compose the final search query string handed to ``search_jobs``.
 
-    - keywords present -> resume-derived query refined by the user's keywords.
+    - keywords present -> the profile's best-fit title plus the user's keywords.
     - keywords absent   -> the profile's ``suggested_query`` alone.
 
-    Always returns a clean, single-line query string.
+    The result is always a SHORT, PLAIN keyword string: boolean operators,
+    parentheses and quotes are stripped defensively (even if the LLM ignores its
+    instructions) and the length is capped, because JSearch / Adzuna treat any
+    boolean syntax as literal text and return zero jobs. Recall comes from the
+    broad query; precision comes from ``rank_jobs`` re-ranking against the full
+    profile (suggested_titles + core_skills).
     """
     base = (profile.suggested_query or "").strip()
     keywords = (user_keywords or "").strip()
 
-    if keywords and base:
+    if base and keywords:
         combined = f"{base} {keywords}"
     elif keywords:
         combined = keywords
     else:
         combined = base
 
-    # Collapse any whitespace into single spaces for a clean single-line query.
-    return re.sub(r"\s+", " ", combined).strip()
+    return _plainify_query(combined)
 
 
 def _tokenize(text: str) -> set[str]:
