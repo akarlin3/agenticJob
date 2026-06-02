@@ -18,6 +18,7 @@ from ingestion import ingest_job_description
 from evaluator import evaluate_job_fit
 from tailor import tailor_application_materials
 from coach import generate_interview_prep
+from portfolio import extract_portfolio_text
 
 def print_banner(title: str):
     print("\n" + "=" * 60)
@@ -120,6 +121,17 @@ def main():
         print("Skipping Tailoring and Interview Coaching agents. Good luck on your next search!")
         sys.exit(0)
         
+    # Extract the candidate's real portfolio text ONCE so both the tailor and
+    # coach agents are grounded in it (LIVE mode only — mock branches use the
+    # synthetic persona). The evaluator above ensures the portfolio file exists.
+    portfolio_text = ""
+    if not run_mock:
+        portfolio_text = extract_portfolio_text(args.portfolio)
+        if portfolio_text:
+            print(f"Extracted {len(portfolio_text)} characters of portfolio text for grounding.")
+        else:
+            print("[!] Could not extract portfolio text; agents will fall back to the synthetic persona bio.")
+
     # 5. Agent 3 - Tailor (Claude 3.5 Sonnet)
     print_banner("Agent 3: Tailoring Application Materials (Claude 3.5 Sonnet)")
     try:
@@ -127,6 +139,8 @@ def main():
         latex_resume, markdown_cover_letter = tailor_application_materials(
             job_details_json=job_analysis_json,
             gap_analysis_json=eval_result_json,
+            portfolio_text=portfolio_text,
+            company=job_analysis.company,
             mock=run_mock
         )
         
@@ -155,6 +169,8 @@ def main():
         questions = generate_interview_prep(
             job_details_json=job_analysis_json,
             gap_analysis_json=eval_result_json,
+            portfolio_text=portfolio_text,
+            company=job_analysis.company,
             mock=run_mock
         )
         

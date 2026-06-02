@@ -40,10 +40,20 @@ class TestEvaluatorMock:
 
 class TestTailorMock:
     def test_returns_persona_consistent_materials(self):
-        resume, letter = tailor_application_materials("{}", "{}", mock=True)
+        # Even when a real portfolio + company are supplied, MOCK mode must keep
+        # returning the synthetic persona output unchanged (CI runs offline).
+        resume, letter = tailor_application_materials(
+            "{}",
+            "{}",
+            portfolio_text="Real Person at Real Corp — confidential bio.",
+            company="Real Corp",
+            mock=True,
+        )
         assert sample_data.PERSONA_NAME in resume
         assert sample_data.PERSONA_NAME in letter
         assert sample_data.COMPANY_CURRENT in resume
+        # The supplied real portfolio/company must NOT leak into mock output.
+        assert "Real Corp" not in resume and "Real Corp" not in letter
         _assert_no_real_identity(resume)
         _assert_no_real_identity(letter)
 
@@ -63,7 +73,14 @@ class TestCoachMock:
             assert q["type"] in ("Technical", "Behavioral")
 
     def test_references_synthetic_persona_not_real_identity(self):
-        questions = generate_interview_prep("{}", "{}", mock=True)
+        questions = generate_interview_prep(
+            "{}",
+            "{}",
+            portfolio_text="Real Person at Real Corp — confidential bio.",
+            company="Real Corp",
+            mock=True,
+        )
         blob = json.dumps(questions)
+        assert "Real Corp" not in blob
         assert sample_data.COMPANY_CURRENT in blob or sample_data.COMPANY_PREVIOUS in blob
         _assert_no_real_identity(blob)

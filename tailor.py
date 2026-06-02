@@ -37,10 +37,22 @@ def _latex_escape(text: str) -> str:
     return "".join(_LATEX_ESCAPES.get(ch, ch) for ch in text)
 
 
-def tailor_application_materials(job_details_json: str, gap_analysis_json: str, mock: bool = False) -> tuple[str, str]:
+def tailor_application_materials(
+    job_details_json: str,
+    gap_analysis_json: str,
+    portfolio_text: str = "",
+    company: str = "",
+    mock: bool = False,
+) -> tuple[str, str]:
     """
-    Sends job details, gap analysis, and optionally the master portfolio details to Claude 3.5 Sonnet.
-    Uses forced tool use to strictly output a customized LaTeX resume and markdown cover letter.
+    Sends job details, gap analysis, and the candidate's actual portfolio text to
+    Claude 3.5 Sonnet. Uses forced tool use to strictly output a customized LaTeX
+    resume and markdown cover letter.
+
+    In LIVE mode the candidate is grounded in ``portfolio_text`` (the real
+    uploaded portfolio), and ``company`` is used so the cover letter names the
+    employer. In MOCK mode the synthetic persona output is returned unchanged.
+
     Returns (latex_resume, markdown_cover_letter).
     """
     if mock:
@@ -153,28 +165,47 @@ Sincerely,
         }
     ]
     
+    # Ground the agent in the candidate's real portfolio. If extraction yielded
+    # nothing (e.g. an image-only PDF), fall back to the synthetic persona bio so
+    # the run still produces materials rather than hallucinating from an empty
+    # context.
+    candidate_portfolio = portfolio_text.strip() if portfolio_text else ""
+    if not candidate_portfolio:
+        logger.warning(
+            "No portfolio text supplied to tailor; falling back to synthetic persona bio."
+        )
+        candidate_portfolio = sample_data.PERSONA_BIO
+
+    company_name = company.strip() if company else ""
+    company_for_prompt = company_name or "the hiring company"
+
     system_prompt = """
     You are an elite executive resume writer and career coach. Your task is to customize the candidate's resume and write a matching cover letter based strictly on the supplied portfolio.
-    
+
     Follow these instructions carefully:
     1. Tailor the LaTeX resume using standard, professional LaTeX (like article class, simple packages like geometry, hyperref, and modern CV patterns). Avoid highly customized template libraries that require local compilation dependencies (e.g. fontawesome5, unless standard) to ensure it compiles flawlessly out-of-the-box on standard LaTeX engines (e.g., pdfLaTeX).
     2. Emphasize the required tech stack and core responsibilities from the job details.
     3. Mitigate or frame the listed technical gaps gracefully in both materials.
-    4. Write a compelling, elegant, and persuasive markdown cover letter.
-    5. You MUST respond ONLY by invoking the tool `generate_application_materials`. Do not write any conversational preamble or postscript.
+    4. Write a compelling, elegant, and persuasive markdown cover letter that explicitly addresses the hiring company by name and names the role.
+    5. ANTI-FABRICATION RULE: Use ONLY the candidate's real experience, employers, dates, skills, and metrics as found in the CANDIDATE PORTFOLIO below. You may reorder, reframe, and emphasize that content, but you MUST NOT invent roles, employers, dates, degrees, or metrics that do not appear in the portfolio.
+    6. You MUST respond ONLY by invoking the tool `generate_application_materials`. Do not write any conversational preamble or postscript.
     """
-    
+
     prompt = f"""
     CANDIDATE PORTFOLIO / BIO INFO:
-    {sample_data.PERSONA_BIO}
+    {candidate_portfolio}
+
+    HIRING COMPANY:
+    {company_for_prompt}
 
     JOB DETAILS:
     {job_details_json}
-    
+
     GAP ANALYSIS / EVALUATION:
     {gap_analysis_json}
-    
-    Please generate the tailored resume and cover letter.
+
+    Please generate the tailored resume and cover letter. The cover letter must
+    address {company_for_prompt} by name and reference the specific role.
     """
     
     logger.info("Calling Claude 3.5 Sonnet to generate tailored application materials with forced tool use...")
