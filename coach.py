@@ -8,11 +8,22 @@ logger = logging.getLogger(__name__)
 # Synthetic demo persona — not a real individual (see sample_data.py).
 import sample_data
 
-def generate_interview_prep(job_details_json: str, gap_analysis_json: str, mock: bool = False) -> list[dict]:
+def generate_interview_prep(
+    job_details_json: str,
+    gap_analysis_json: str,
+    portfolio_text: str = "",
+    company: str = "",
+    mock: bool = False,
+) -> list[dict]:
     """
-    Sends the job details and gap analysis to Claude 3.5 Sonnet to generate
-    targeted behavioral and technical interview questions, complete with rationales
-    and answering strategies.
+    Sends the job details, gap analysis, and the candidate's actual portfolio text
+    to Claude 3.5 Sonnet to generate targeted behavioral and technical interview
+    questions, complete with rationales and answering strategies.
+
+    In LIVE mode the questions are grounded in ``portfolio_text`` (the real
+    uploaded portfolio) and reference the hiring ``company``. In MOCK mode the
+    synthetic persona questions are returned unchanged.
+
     Returns a list of structured question dictionaries.
     """
     if mock:
@@ -85,23 +96,44 @@ def generate_interview_prep(job_details_json: str, gap_analysis_json: str, mock:
         }
     ]
     
+    # Ground coaching in the candidate's real portfolio; fall back to the
+    # synthetic persona bio only if no portfolio text was extracted.
+    candidate_portfolio = portfolio_text.strip() if portfolio_text else ""
+    if not candidate_portfolio:
+        logger.warning(
+            "No portfolio text supplied to coach; falling back to synthetic persona bio."
+        )
+        candidate_portfolio = sample_data.PERSONA_BIO
+
+    company_name = company.strip() if company else ""
+    company_for_prompt = company_name or "the hiring company"
+
     system_prompt = f"""
-    You are an elite technology interview coach. Your task is to prepare a candidate ({sample_data.PERSONA_NAME}) for an interview by generating highly targeted technical and behavioral questions.
+    You are an elite technology interview coach. Your task is to prepare the candidate for an interview at {company_for_prompt} by generating highly targeted technical and behavioral questions.
     Focus heavily on:
     1. The core responsibilities and technical stack required by the job description.
     2. The technical gaps identified in the evaluation phase, to help the candidate prepare to address these weaknesses proactively.
-    
+    3. The candidate's ACTUAL background as described in the portfolio below — anchor behavioral questions and suggested strategies in their real experience.
+
+    ANTI-FABRICATION RULE: Base questions and strategies only on the candidate's real experience, employers, and metrics as found in the CANDIDATE PORTFOLIO. Do not invent roles, employers, dates, or metrics that do not appear there.
+
     You MUST respond ONLY by invoking the tool `output_interview_prep`. Do not write any conversational preamble or postscript.
     """
-    
+
     prompt = f"""
+    CANDIDATE PORTFOLIO / BIO INFO:
+    {candidate_portfolio}
+
+    HIRING COMPANY:
+    {company_for_prompt}
+
     JOB DETAILS:
     {job_details_json}
-    
+
     GAP ANALYSIS / EVALUATION:
     {gap_analysis_json}
-    
-    Please generate 5-6 extremely relevant interview questions (mix of technical and behavioral) that the candidate should prepare for, especially focusing on how to defend their technical gaps.
+
+    Please generate 5-6 extremely relevant interview questions (mix of technical and behavioral) that the candidate should prepare for, especially focusing on how to defend their technical gaps and how to leverage their real portfolio experience.
     """
     
     logger.info("Calling Claude 3.5 Sonnet to generate interview coach preparation guide...")

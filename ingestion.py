@@ -29,6 +29,8 @@ _gemini_retry = retry(
 # Define the Pydantic schema for structured output
 class JobAnalysis(BaseModel):
     role_title: str = Field(description="The primary official title of the role.")
+    company: str = Field(default="", description="The hiring company / employer name. Empty string if not stated in the job description.")
+    location: str = Field(default="", description="The job location (city, region, or 'Remote'). Empty string if not stated.")
     required_tech_stack: list[str] = Field(description="List of primary programming languages, frameworks, databases, and DevOps tools required.")
     core_responsibilities: list[str] = Field(description="List of key daily responsibilities and deliverables.")
     domain_expertise: list[str] = Field(description="List of domains or business sectors required (e.g., FinTech, SaaS, Healthcare, AI).")
@@ -42,6 +44,8 @@ def ingest_job_description(job_description: str, mock: bool = False) -> JobAnaly
         logger.info("[Mock Mode] Bypassing Gemini Ingestion API...")
         return JobAnalysis(
             role_title="Senior Full Stack AI Orchestration Engineer (FinTech / SaaS)",
+            company="Acme AI Systems",
+            location="Remote (US)",
             required_tech_stack=["Python", "FastAPI", "React", "PostgreSQL", "Docker", "AWS", "Terraform", "GCP", "PyTorch"],
             core_responsibilities=[
                 "Design, scale, and optimize high-throughput REST APIs using Python and PostgreSQL.",
@@ -59,8 +63,11 @@ def ingest_job_description(job_description: str, mock: bool = False) -> JobAnaly
     client = genai.Client(api_key=api_key)
     
     prompt = f"""
-    Please analyze the following job description and extract the required details:
-    
+    Please analyze the following job description and extract the required details.
+    Be sure to identify the hiring company name and the job location when they are
+    stated; if either is genuinely absent from the text, return an empty string for
+    that field rather than guessing.
+
     JOB DESCRIPTION:
     \"\"\"
     {job_description}

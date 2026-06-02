@@ -18,6 +18,7 @@ from evaluator import evaluate_job_fit
 from tailor import tailor_application_materials
 from coach import generate_interview_prep
 from create_portfolio import generate_portfolio
+from portfolio import extract_portfolio_text
 from searcher import search_jobs
 
 PDF_MAGIC = b"%PDF-"
@@ -203,6 +204,21 @@ async def _pipeline_events(
         yield "terminated", {"reason": "fit_below_threshold"}
         return
 
+    # Extract the candidate's real portfolio text ONCE so both the tailor and
+    # coach agents are grounded in it (LIVE mode only — mock branches use the
+    # synthetic persona).
+    portfolio_text = ""
+    if not mock:
+        portfolio_text = await run_in_threadpool(extract_portfolio_text, portfolio_path)
+        if portfolio_text:
+            yield "log", {
+                "message": f"Extracted {len(portfolio_text)} characters of portfolio text for grounding."
+            }
+        else:
+            yield "log", {
+                "message": "Could not extract portfolio text; agents will fall back to the synthetic persona bio."
+            }
+
     # Agent 3 - Tailor
     yield "stage", {"name": "tailor", "status": "active"}
     yield "log", {
@@ -213,6 +229,8 @@ async def _pipeline_events(
             tailor_application_materials,
             job_details_json=job_analysis_json,
             gap_analysis_json=eval_result_json,
+            portfolio_text=portfolio_text,
+            company=job_analysis.company,
             mock=mock,
         )
         with open(RESUME_TEX_PATH, "w") as f:
@@ -253,6 +271,8 @@ async def _pipeline_events(
             generate_interview_prep,
             job_details_json=job_analysis_json,
             gap_analysis_json=eval_result_json,
+            portfolio_text=portfolio_text,
+            company=job_analysis.company,
             mock=mock,
         )
         coach_save_path = os.path.join(OUTPUT_DIR, "interview_prep.md")
