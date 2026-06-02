@@ -364,6 +364,11 @@ document.addEventListener("DOMContentLoaded", () => {
         formData.append("date_posted", datePosted);
         formData.append("remote", remoteOnly);
         formData.append("mock", isMock);
+        // The portfolio drives the resume-based search & ranking when supplied;
+        // otherwise the server reuses any persisted master_portfolio.pdf.
+        if (portfolioInput.files.length > 0) {
+            formData.append("portfolio", portfolioInput.files[0]);
+        }
 
         try {
             const response = await fetch("/api/search", {
@@ -372,11 +377,14 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             const data = await response.json();
-            
+
             if (!response.ok) {
                 throw new Error(data.detail || "Failed to search job boards.");
             }
 
+            if (data.query) {
+                addLogLine("system", `[Search Agent] Searched using: ${data.query}`);
+            }
             renderDiscoveredJobs(data.jobs);
             setStatus("success", "Discovered");
             addLogLine("success", `[Search Agent] Sourcing Complete. Successfully discovered ${data.jobs.length} jobs.`);
@@ -406,10 +414,14 @@ document.addEventListener("DOMContentLoaded", () => {
             card.className = "job-card";
             
             // Build the card HTML
+            const fitBadge = (typeof job.fit_score === "number")
+                ? `<span class="jc-fit" title="Resume relevance">★ ${job.fit_score}% fit</span>`
+                : "";
+
             card.innerHTML = `
                 <div class="jc-header">
                     <span class="jc-title">${job.title}</span>
-                    <span class="jc-source">${job.source}</span>
+                    <span class="jc-badges">${fitBadge}<span class="jc-source">${job.source}</span></span>
                 </div>
                 <div class="jc-meta">
                     <span><strong>Company:</strong> ${job.company}</span>
