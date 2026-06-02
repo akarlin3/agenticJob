@@ -20,6 +20,12 @@ from coach import generate_interview_prep
 from create_portfolio import generate_portfolio
 from portfolio import extract_portfolio_text
 from searcher import search_jobs
+from search_profile import (
+    CandidateSearchProfile,
+    extract_search_profile,
+    build_search_query,
+    rank_jobs,
+)
 
 PDF_MAGIC = b"%PDF-"
 OUTPUT_DIR = "output"
@@ -314,27 +320,78 @@ def health_check():
 
 @app.post("/api/search")
 async def run_search(
-    query: str = Form(...),
-    location: str = Form(...),
-    platforms: str = Form(...),
+    query: str = Form(""),
+    location: str = Form(""),
+    platforms: str = Form(""),
     date_posted: str = Form("month"),
     remote: bool = Form(False),
     mock: bool = Form(True),
+    portfolio: UploadFile = File(None),
 ):
+    """Portfolio-driven job discovery.
+
+    The candidate's portfolio builds the search query and re-ranks the returned
+    postings; user ``query`` keywords are optional refinements. Flow:
+    resolve portfolio -> extract text -> extract search profile ->
+    build query (profile + optional keywords) -> search_jobs -> rank_jobs.
+    """
+    keywords = (query or "").strip()
+    platform_list = [p.strip() for p in platforms.split(",") if p.strip()]
+    if not platform_list:
+        platform_list = ["LinkedIn", "Indeed"]
+
+    # A portfolio is "available" if one was uploaded now or persisted earlier.
+    # We deliberately check existence here (rather than letting _resolve_portfolio
+    # synthesize a default) so the no-portfolio-no-keywords case can fail loudly.
+    has_upload = portfolio is not None and bool(getattr(portfolio, "filename", ""))
+    portfolio_available = has_upload or os.path.exists("master_portfolio.pdf")
+
+    # Fail loudly (repo convention): without either signal there is nothing to
+    # search on — don't silently return [].
+    if not portfolio_available and not keywords:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide a portfolio or at least one keyword to search.",
+        )
+
     try:
-        platform_list = [p.strip() for p in platforms.split(",") if p.strip()]
-        if not platform_list:
-            platform_list = ["LinkedIn", "Indeed"]
+        # Build the candidate search profile from the portfolio when available.
+        if portfolio_available:
+            portfolio_path = await _resolve_portfolio(portfolio)
+            if mock:
+                # Mock profile is persona-derived; no PDF text read required.
+                profile = await run_in_threadpool(
+                    extract_search_profile, "", True
+                )
+            else:
+                portfolio_text = await run_in_threadpool(
+                    extract_portfolio_text, portfolio_path
+                )
+                profile = await run_in_threadpool(
+                    extract_search_profile, portfolio_text, False
+                )
+        else:
+            # Keywords-only search: no resume signal, empty profile.
+            profile = CandidateSearchProfile(
+                suggested_titles=[], core_skills=[], suggested_query=""
+            )
+
+        final_query = build_search_query(profile, keywords)
+
         jobs = await run_in_threadpool(
             search_jobs,
-            query=query,
+            query=final_query,
             location=location,
             platforms=platform_list,
             date_posted=date_posted,
             remote=remote,
             mock=mock,
         )
-        return {"status": "success", "jobs": jobs}
+
+        ranked = rank_jobs(jobs, profile)
+        return {"status": "success", "query": final_query, "jobs": ranked}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Error in search API: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
