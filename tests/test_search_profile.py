@@ -58,6 +58,59 @@ class TestBuildSearchQuery:
         )
         assert build_search_query(empty, "data engineer") == "data engineer"
 
+    @staticmethod
+    def _assert_plain(query: str):
+        # JSearch / Adzuna have no boolean support: the query must be plain.
+        assert "AND" not in query
+        assert " OR " not in query
+        assert "(" not in query
+        assert ")" not in query
+        assert '"' not in query
+        # Broad + short: a handful of plain, space-separated words.
+        assert query == " ".join(query.split())
+        assert len(query.split()) <= 6
+
+    def test_outputs_are_always_plain_and_short(self):
+        # resume-only, resume+keywords, and keywords-only all stay plain & short.
+        self._assert_plain(build_search_query(self._profile(), None))
+        self._assert_plain(build_search_query(self._profile(), "remote startup"))
+        empty = CandidateSearchProfile(
+            suggested_titles=[], core_skills=[], suggested_query=""
+        )
+        self._assert_plain(build_search_query(empty, "data engineer"))
+
+    def test_boolean_query_is_flattened_regression(self):
+        # The reported failing case: the LLM emits a boolean expression. It must
+        # be flattened to a short plain string, never passed through verbatim.
+        boolean = (
+            '(Computational Physicist OR Data Scientist) AND '
+            '(Python OR MATLAB) AND ("Medical Imaging" OR "Signal Processing")'
+        )
+        profile = CandidateSearchProfile(
+            suggested_titles=["Computational Physicist", "Data Scientist"],
+            core_skills=["Python", "MATLAB", "Medical Imaging"],
+            suggested_query=boolean,
+        )
+        q = build_search_query(profile, None)
+        self._assert_plain(q)
+        # The leading title survives the flattening (recall is preserved).
+        assert q.startswith("Computational Physicist")
+
+    def test_keywords_with_boolean_are_stripped(self):
+        # Defensive: even boolean-ish user keywords are flattened.
+        empty = CandidateSearchProfile(
+            suggested_titles=[], core_skills=[], suggested_query=""
+        )
+        q = build_search_query(empty, '(Backend OR Frontend) AND "Python"')
+        self._assert_plain(q)
+        assert q == "Backend Frontend Python"
+
+    def test_mock_profile_query_is_plain(self):
+        # MOCK output must also be a short plain phrase, not a boolean expression.
+        profile = extract_search_profile("", mock=True)
+        self._assert_plain(profile.suggested_query)
+        assert profile.suggested_query  # non-empty
+
 
 class TestRankJobs:
     def test_higher_overlap_sorts_first(self):
